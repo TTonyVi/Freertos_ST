@@ -26,16 +26,16 @@ static void OLED_Render(const DisplayMsg_t *msg)
     BSP_OLED_Clear();
 
     /* Row 0 — static title */
-    BSP_OLED_DrawText(0, 0, "Washing Machine");
+    BSP_OLED_DrawText(2, 2, "Washing Machine");
 
     /* Row 1 — Wash menu item with cursor */
-    BSP_OLED_DrawText(0, 1, (msg->menuIndex == 0u) ? "> Wash" : "  Wash");
+    BSP_OLED_DrawText(2, 3, (msg->menuIndex == 0u) ? "> Wash" : "  Wash");
 
     /* Row 2 — Spin menu item with cursor */
-    BSP_OLED_DrawText(0, 2, (msg->menuIndex == 1u) ? "> Spin" : "  Spin");
+    BSP_OLED_DrawText(2, 4, (msg->menuIndex == 1u) ? "> Spin" : "  Spin");
 
     /* Row 3 — status text from WashingManager */
-    BSP_OLED_DrawText(0, 3, msg->statusText);
+    BSP_OLED_DrawText(2, 5, msg->statusText);
 
     BSP_OLED_Refresh();
 }

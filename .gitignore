@@ -1,0 +1,30 @@
+# Build folders
+Debug/
+Release/
+
+# Object files
+*.o
+*.d
+*.su
+
+# Executables
+*.elf
+*.bin
+*.hex
+*.map
+*.list
+
+# STM32CubeIDE generated
+Debug/*
+Release/*
+
+# Temporary files
+*.tmp
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Eclipse settings (tùy chọn)
+.settings/language.settings.xml
