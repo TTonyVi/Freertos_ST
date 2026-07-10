@@ -28,3 +28,9 @@ Thumbs.db
 
 # Eclipse settings (tùy chọn)
 .settings/language.settings.xml
+Debug/App/OLEDTask/Src/oled_task.o
+Debug/Freertos.elf
+Debug/Freertos.list
+Debug/App/OLEDTask/Src/oled_task.o
+Debug/Freertos.elf
+Debug/Freertos.list
