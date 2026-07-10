@@ -1,0 +1,2 @@
+../App/Common/Src/freertos_objects.c:49:13:Timer_PhaseCallback	16	static
+../App/Common/Src/freertos_objects.c:93:6:App_FreeRTOSObjectsInit	48	static,ignoring_inline_asm

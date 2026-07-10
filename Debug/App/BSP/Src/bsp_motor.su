@@ -1,0 +1,4 @@
+../App/BSP/Src/bsp_motor.c:12:6:BSP_Motor_Init	8	static
+../App/BSP/Src/bsp_motor.c:17:6:BSP_Motor_Start	8	static
+../App/BSP/Src/bsp_motor.c:22:6:BSP_Motor_Stop	8	static
+../App/BSP/Src/bsp_motor.c:27:9:BSP_Motor_IsRunning	8	static

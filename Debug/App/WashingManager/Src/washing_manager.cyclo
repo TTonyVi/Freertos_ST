@@ -1,0 +1,10 @@
+../App/WashingManager/Src/washing_manager.c:56:13:Manager_OnEnterIdle	1
+../App/WashingManager/Src/washing_manager.c:69:13:Manager_OnEnterFillWater	1
+../App/WashingManager/Src/washing_manager.c:77:13:Manager_OnEnterWashing	1
+../App/WashingManager/Src/washing_manager.c:85:13:Manager_OnEnterDrain	1
+../App/WashingManager/Src/washing_manager.c:93:13:Manager_OnEnterSpin	1
+../App/WashingManager/Src/washing_manager.c:101:13:Manager_OnEnterFinish	1
+../App/WashingManager/Src/washing_manager.c:112:13:Manager_OnEnterError	1
+../App/WashingManager/Src/washing_manager.c:134:13:Manager_PostDisplay	1
+../App/WashingManager/Src/washing_manager.c:154:13:Manager_HandleCommand	5
+../App/WashingManager/Src/washing_manager.c:183:6:WashingManager_Task	15

@@ -1,0 +1,2 @@
+../App/BSP/Src/bsp_sensor.c:19:9:BSP_Sensor_IsDoorClosed	2
+../App/BSP/Src/bsp_sensor.c:24:9:BSP_Sensor_IsWaterFull	1

@@ -1,0 +1,4 @@
+../App/WashingManager/Src/washing_sm.c:82:13:SM_ExecuteEntryAction	15
+../App/WashingManager/Src/washing_sm.c:123:6:WashingSM_Init	2
+../App/WashingManager/Src/washing_sm.c:138:13:WashingSM_ProcessEvent	4
+../App/WashingManager/Src/washing_sm.c:161:13:WashingSM_GetState	1
