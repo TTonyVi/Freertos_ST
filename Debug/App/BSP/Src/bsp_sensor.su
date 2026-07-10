@@ -1,2 +1,0 @@
-../App/BSP/Src/bsp_sensor.c:19:9:BSP_Sensor_IsDoorClosed	8	static
-../App/BSP/Src/bsp_sensor.c:24:9:BSP_Sensor_IsWaterFull	4	static

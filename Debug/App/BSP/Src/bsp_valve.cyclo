@@ -1,4 +1,0 @@
-../App/BSP/Src/bsp_valve.c:19:6:BSP_Valve_Init	1
-../App/BSP/Src/bsp_valve.c:24:6:BSP_Valve_Open	1
-../App/BSP/Src/bsp_valve.c:29:6:BSP_Valve_Close	1
-../App/BSP/Src/bsp_valve.c:34:9:BSP_Valve_IsOpen	2

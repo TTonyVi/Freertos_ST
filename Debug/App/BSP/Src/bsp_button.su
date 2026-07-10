@@ -1,2 +1,0 @@
-../App/BSP/Src/bsp_button.c:25:6:BSP_Button_Init	40	static
-../App/BSP/Src/bsp_button.c:53:6:BSP_Button_IRQHandler	16	static

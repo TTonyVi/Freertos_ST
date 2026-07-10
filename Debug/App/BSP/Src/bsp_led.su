@@ -1,4 +1,0 @@
-../App/BSP/Src/bsp_led.c:12:6:BSP_LED_Init	8	static
-../App/BSP/Src/bsp_led.c:17:6:BSP_LED_On	8	static
-../App/BSP/Src/bsp_led.c:22:6:BSP_LED_Off	8	static
-../App/BSP/Src/bsp_led.c:27:6:BSP_LED_Toggle	8	static
