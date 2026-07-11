@@ -5,6 +5,96 @@ Cập nhật sau mỗi phiên Q&A trước khi bắt đầu viết code.
 
 ---
 
+## Session 07 — 2026-07-10 — Test thủ công WashingManager & Bug #8/#9
+
+**Chủ đề:** Soạn kịch bản test tay cho state machine, phát hiện và fix race
+condition PA0 (button vs door sensor), giải thích LED/OLED expected behavior.
+
+---
+
+### Q1: Kịch bản test WashingManager nên chạy theo cách nào — unit test PC hay test tay trên board?
+
+**Trả lời của bạn:** Test thủ công trên board thật.
+
+**Kết quả:** Soạn bảng test case bám theo `kTransitions[]` trong `washing_sm.c`,
+map Logic Analyzer CH0-CH3 vào PD12-PD15, dùng debugger Live Expressions cho
+`s_waterFull`. Phát hiện trước khi test: `bsp_sensor.c` đọc door qua PA0 —
+trùng chân với `bsp_button.c` — dự đoán sẽ gây lỗi ngay khi long-press.
+
+---
+
+### Q2: Test thật trên board — bấm Wash, LED cam+xanh dương sáng, SM vào FILL_WATER rồi lập tức ERROR khi thả tay
+
+**Đánh giá:** Đúng như dự đoán ở Q1 — xác nhận bug PA0 dùng chung cho
+button (cần thả tay để xác nhận long-press) và door sensor (thả tay = đọc
+thành "cửa mở"). Ghi lại thành **Bug #8** trong `HARDWARE_BUGS.md`.
+
+**Quyết định fix:** Phương án A — biến `s_doorClosed` giả lập qua debugger
+(giống `s_waterFull`), bỏ hẳn việc đọc GPIO PA0 trong `bsp_sensor.c`. Build
+thành công, không lỗi. Xem TD-11 trong `PROJECT_PROGRESS.md`.
+
+---
+
+### Q3: LED hiển thị đúng như thế nào khi chọn Wash?
+
+**Trả lời:** Bảng trạng thái LD3/LD4/LD5/LD6 theo từng state, dựa trên các
+entry-action callback trong `washing_manager.c`. LD6 (status) sáng liên tục
+từ `FILL_WATER` đến hết `SPIN`, chỉ tắt ở `FINISH`/`ERROR`/`IDLE` — không
+phải đèn theo pha mà là đèn "máy đang hoạt động".
+
+---
+
+### Q4: OLED hiển thị đúng như thế nào khi chọn Wash?
+
+**Trả lời:** 4 dòng cố định (tiêu đề, Wash, Spin, statusText), cursor giữ
+nguyên vị trí đã chọn suốt chu trình vì `s_menuIndex` chỉ đổi khi có lệnh
+mới. Phát hiện thêm **Bug #9** (chưa fix): short-press giữa chu trình làm
+OLED tạm hiện sai `"IDLE"` do `s_statusCache` trong `ui_task.c` không bao
+giờ được cập nhật sau lần khởi tạo.
+
+---
+
+### Q5: Sau khi vào FILL_WATER, vài giây sau ERROR — có phải bug không?
+
+**Trả lời:** Không — đây là hành vi đúng thiết kế. `WASH_FILL_DURATION_MS`
+= 10000ms; vì `s_waterFull` mặc định = 0 và không ai set qua debugger,
+`xFillTimeoutTimer` tự bắn `EVT_TIMEOUT` sau đúng 10s → SM chuyển
+`FILL_WATER → ERROR` theo transition table. Xác nhận bug PA0 (Bug #8) đã
+được fix thành công — đường lỗi còn lại là do chưa mô phỏng nước đầy, không
+phải do cửa.
+
+---
+
+## Session 08 — 2026-07-10 — Bug #10: Không thoát được FINISH/ERROR
+
+**Chủ đề:** Test tiếp sau khi fix Bug #8 — chạy hết chu trình Wash bằng cách
+set `s_waterFull = 1u`, phát hiện máy đứng yên ở `FINISHED` không phản hồi
+nút bấm nữa.
+
+---
+
+### Q1: Set `s_waterFull = 1u`, chạy đến FINISHED, nhưng sau đó chọn Wash/Spin thì hệ thống không hoạt động nữa — vì sao?
+
+**Trả lời:** `UITask` không bao giờ gửi `CMD_RESET` — long-press handler chỉ
+build `CMD_START_WASH`/`CMD_START_SPIN` ([ui_task.c:73-90](../App/UITask/Src/ui_task.c#L73-L90)).
+Trong khi đó, transition table chỉ cho phép thoát `FINISH`/`ERROR` bằng
+`WASH_EVT_RESET` — mọi event khác bị âm thầm bỏ qua theo đúng spec của SM.
+Ghi lại thành **Bug #10** trong `HARDWARE_BUGS.md`.
+
+**Hai phương án đã thảo luận:**
+- Phương án A (khuyến nghị): `Manager_HandleCommand()` tự kiểm tra
+  `WashingSM_GetState()` — nếu đang FINISH/ERROR, mọi command đến đều hiểu
+  là RESET. Không cần IPC mới, giữ đúng nguyên tắc UITask không cần biết
+  state máy.
+- Phương án B: thêm kênh phản hồi ngược để UITask tự biết state — phức tạp
+  hơn, phá vỡ tách biệt kiến trúc sẵn có.
+
+**Trạng thái:** Đã ghi lại phân tích đầy đủ vào `HARDWARE_BUGS.md` (Bug #10)
+và `PROJECT_PROGRESS.md`. Chưa implement — đang chờ xác nhận chọn phương án
+trước khi sửa code, theo đúng quy trình review của CLAUDE.md.
+
+---
+
 ## Session 06 — 2026-06-26 — Phase 8: SEGGER SystemView
 
 **Chủ đề:** RTT transport, queue registry, vQueueAddToRegistry, SEGGER_SYSVIEW_Conf/Start.

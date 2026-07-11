@@ -3,15 +3,15 @@
  * @brief   Sensor BSP — simulated door and water-level inputs.
  *
  * In the real system these would be read from GPIO pins wired to physical
- * sensors.  In this simulation the values are controlled by toggling
- * GPIO output pins with a logic analyser or by writing to the state
- * variables directly via the debugger.
+ * sensors. In this simulation both values are plain static variables that
+ * default to a safe/idle reading and are changed directly via the debugger
+ * (Live Expressions / Variables view) while the target is running.
  *
  * No FreeRTOS dependency — safe to call from any context.
  *
  * Hardware mapping (simulation):
- *   Door sensor    : PA0 user button — pressed = door closed
- *   Water sensor   : not wired; always returns a fixed simulated value
+ *   Door sensor    : not wired; s_doorClosed defaults to 1 (closed)
+ *   Water sensor   : not wired; s_waterFull defaults to 0 (empty)
  */
 
 #ifndef APP_BSP_BSP_SENSOR_H

@@ -418,6 +418,178 @@ void BSP_OLED_Init(void)
 
 ---
 
+## Bug #8 — Door Sensor Dùng Chung Chân PA0 Với Button (Race Condition)
+
+### Triệu chứng
+Bấm giữ B1 để chọn "Wash" (long press ≥1.5s), LED cam (inlet) và LED xanh dương
+(status) sáng lên đúng như vào `FILL_WATER` — nhưng ngay sau khi thả tay ra,
+máy lập tức nhảy sang `ERROR`, mọi LED tắt.
+
+### Root Cause
+
+`bsp_sensor.c` mô phỏng cảm biến cửa bằng cách đọc lại **cùng chân PA0** mà
+`bsp_button.c` dùng cho B1 User Button (comment gốc: *"Button held = door
+closed"*):
+
+```c
+#define DOOR_PORT   GPIOA
+#define DOOR_PIN    GPIO_PIN_0   // ← trùng chân với B1
+
+uint8_t BSP_Sensor_IsDoorClosed(void)
+{
+    return (HAL_GPIO_ReadPin(DOOR_PORT, DOOR_PIN) == GPIO_PIN_SET) ? 1u : 0u;
+}
+```
+
+Cơ chế đo long-press trong `BSP_Button_IRQHandler()` bắt buộc phải chờ **cạnh
+xuống** (thả tay) mới tính được duration và bắn `BTN_EVENT_LONG_PRESS`. Nghĩa
+là hành động thả tay — điều kiện bắt buộc để xác nhận lệnh — đồng thời cũng
+khiến PA0 về LOW, và `SensorTask` (poll mỗi 100ms) đọc đó là "cửa vừa mở":
+
+```
+User giữ B1 ≥1.5s → thả tay
+  → PA0 = LOW
+  → BSP_Button_IRQHandler(): duration ≥ 1500ms → BTN_EVENT_LONG_PRESS
+      → UITask → CMD_START_WASH → SM: IDLE → FILL_WATER
+  → (≤100ms sau) SensorTask: BSP_Sensor_IsDoorClosed() == LOW
+      → xEventGroupSetBits(EVT_ERROR)
+      → SM: FILL_WATER → ERROR
+```
+
+Hai vai trò khác bản chất (input điều khiển UI cần "thả để xác nhận", cảm
+biến an toàn cần "thả nghĩa là nguy hiểm") bị gán chung một chân vật lý, tạo
+ra race condition gần như luôn xảy ra với thao tác tay người.
+
+### Fix
+
+Tách "cửa" thành biến software thuần túy, giống cách `s_waterFull` đã mô
+phỏng mực nước — không đọc GPIO nữa:
+
+```c
+// bsp_sensor.c sau fix
+static volatile uint8_t s_doorClosed = 1u;   /* mặc định: đóng (an toàn) */
+
+uint8_t BSP_Sensor_IsDoorClosed(void)
+{
+    return s_doorClosed;
+}
+```
+
+PA0 giờ chỉ còn đúng một chủ sở hữu: `bsp_button.c`. Muốn test tình huống mở
+cửa, set `s_doorClosed = 0` qua debugger (Live Expressions) trong lúc máy
+đang chạy.
+
+### Bài học
+
+| Khái niệm | Giải thích |
+|---|---|
+| Shared-pin race condition | Hai module đọc/ghi cùng chân GPIO cho hai mục đích khác bản chất (điều khiển vs an toàn) → hành vi cần thiết của module này vô tình kích hoạt module kia |
+| Input điều khiển vs cảm biến an toàn | Luôn tách riêng về mặt vật lý (hoặc mô phỏng riêng) — không bao giờ dùng chung một tín hiệu |
+| Simulation qua debugger | Khi chưa có cảm biến thật, biến static + debugger write là cách mô phỏng an toàn, nhất quán (đã áp dụng sẵn cho nước, giờ áp dụng luôn cho cửa) |
+
+---
+
+## Bug #9 — OLED Hiển Thị Sai Status Khi Bấm Nút Giữa Chu Trình (CHƯA FIX)
+
+### Triệu chứng
+Nếu short-press B1 trong lúc máy đang chạy (`FILL_WATER`/`WASHING`/`DRAIN`/`SPIN`),
+dòng status cuối OLED tạm thời nhảy về `IDLE` sai lệch, dù máy vẫn đang chạy
+đúng state thực tế.
+
+### Root Cause
+
+`UITask` không biết `WashingManager` đang ở state nào — nó xử lý mọi
+`BTN_EVENT_SHORT_PRESS` như đang ở màn hình chờ, và tự gửi một `DisplayMsg_t`
+đè lên màn hình dùng `s_statusCache`:
+
+```c
+// ui_task.c
+static char s_statusCache[24] = "IDLE";   // chỉ khởi tạo 1 lần, không nơi nào update lại
+
+if (event == BTN_EVENT_SHORT_PRESS)
+{
+    ...
+    strncpy(disp.statusText, s_statusCache, sizeof(disp.statusText) - 1u);
+    xQueueSend(xDisplayQueue, &disp, 0);   // luôn gửi "IDLE"
+}
+```
+
+### Trạng thái
+
+**Đã phát hiện, chưa fix.** Đang chờ quyết định hướng xử lý — hai lựa chọn khả
+dĩ: (a) `WashingManager` gửi `statusText` mới nhất cho `UITask` biết (thêm
+kênh đồng bộ), hoặc (b) `UITask` không tự gửi display update khi máy không ở
+`IDLE`. Chưa quyết — ghi lại ở đây để không quên khi quay lại.
+
+---
+
+## Bug #10 — Không Thể Thoát FINISH/ERROR: UITask Không Bao Giờ Gửi CMD_RESET
+
+### Triệu chứng
+Chạy hết một chu trình Wash (set `s_waterFull = 1u` qua debugger để qua
+`FILL_WATER`) → máy vào `FINISHED` đúng như mong đợi. Nhưng sau đó bấm long
+press để chọn lại Wash hoặc Spin thì **hệ thống không phản hồi gì cả** — màn
+hình đứng yên ở `FINISHED`, LED không đổi, bấm bao nhiêu lần cũng vậy.
+
+### Root Cause
+
+Đường thoát duy nhất khỏi `FINISH` (và `ERROR`) trong transition table là:
+
+```c
+// washing_sm.c
+{ WASH_STATE_FINISH, WASH_EVT_RESET, WASH_STATE_IDLE },
+{ WASH_STATE_ERROR,  WASH_EVT_RESET, WASH_STATE_IDLE },
+```
+
+`WASH_EVT_RESET` chỉ được tạo khi `WashingManager` nhận `CMD_RESET`
+([washing_manager.c:170-172](../App/WashingManager/Src/washing_manager.c#L170-L172)).
+Nhưng `UITask`'s long-press handler không có nhánh nào gửi `CMD_RESET` — nó
+luôn build `CMD_START_WASH` hoặc `CMD_START_SPIN` tùy `menuIndex`
+([ui_task.c:73-90](../App/UITask/Src/ui_task.c#L73-L90)):
+
+```c
+else if (event == BTN_EVENT_LONG_PRESS)
+{
+    CommandMsg_t cmd;
+    cmd.menuIndex = menuIndex;
+    if (menuIndex == 0u) { cmd.command = CMD_START_WASH; ... }
+    else                 { cmd.command = CMD_START_SPIN; ... }
+    xQueueSend(xCommandQueue, &cmd, 0);
+    // không có branch nào gửi CMD_RESET
+}
+```
+
+Khi long-press tới `WashingManager` lúc đang ở `FINISH`, nó gọi
+`WashingSM_ProcessEvent(WASH_EVT_START_WASH)`, nhưng bảng chuyển trạng thái
+không có row `(FINISH, START_WASH)` → sự kiện bị **âm thầm bỏ qua** đúng như
+spec: *"Any (state, event) pair not listed above is silently ignored"*
+([washing_sm.h:59](../App/WashingManager/Inc/washing_sm.h#L59)). Không phải
+crash hay treo — SM chỉ đơn giản đứng yên vì luôn nhận sai loại sự kiện.
+
+### Trạng thái
+
+**Đã phát hiện, đang chờ xác nhận hướng fix.** Hai phương án đã thảo luận:
+
+- **Phương án A (khuyến nghị):** `Manager_HandleCommand()` tự kiểm tra
+  `WashingSM_GetState()` trước khi switch theo `cmd->command` — nếu đang ở
+  `FINISH`/`ERROR`, mọi lệnh đến (bất kể `CMD_START_WASH` hay
+  `CMD_START_SPIN`) đều được diễn giải là `WASH_EVT_RESET`. Không cần thêm
+  IPC mới, đúng nguyên tắc "WashingManager là chủ sở hữu duy nhất của state
+  machine" (Design Rule #1).
+- **Phương án B:** Thêm kênh phản hồi ngược để `UITask` biết state hiện tại
+  và tự gửi `CMD_RESET` đúng lúc — phức tạp hơn, phá vỡ việc UITask vốn
+  "mù" hoàn toàn về state machine từ đầu dự án.
+
+### Bài học
+
+| Khái niệm | Giải thích |
+|---|---|
+| Silent event ignore | Table-driven SM bỏ qua event không khớp state hiện tại — an toàn (không crash) nhưng dễ tạo cảm giác "hệ thống treo" nếu không có đường thoát cho mọi state cuối |
+| Terminal state cần đường thoát tường minh | Mọi state không phải IDLE đều phải có ít nhất 1 transition dẫn trở lại — thiết kế transition table xong cần rà lại xem có "state cụt" nào không |
+| Ai nên diễn giải command theo context | Task sở hữu state (ở đây là WashingManager) nên là nơi diễn giải ý nghĩa command theo state hiện tại, thay vì bắt task gửi command (UITask) phải biết trước state của task nhận |
+
+---
+
 ## Tổng kết — Timeline fix
 
 ```
@@ -427,6 +599,9 @@ Flash lần 3 → [Bug #3] configASSERT hang → disable check (workaround)
 Flash lần 4 → [Bug #4] HardFault (EXC_RETURN) → proper fix with weak symbols
 Flash lần 5 → Firmware RUNS ✓ → phát hiện Bug #5, #6, #7
 Flash lần 6 → All bugs fixed ✓
+Flash lần 7 → Test thủ công FILL_WATER → [Bug #8] PA0 shared với button → fix (door = software flag)
+Flash lần 8 → Test lại: đúng thiết kế (fill timeout 10s → ERROR khi chưa set s_waterFull) ✓
+             → phát hiện [Bug #9] OLED status cache — CHƯA fix, ghi lại chờ xử lý
 ```
 
 ## Cheat Sheet — Debug Checklist cho STM32 + FreeRTOS
@@ -439,4 +614,6 @@ Flash lần 6 → All bugs fixed ✓
 [ ] Long press threshold có phù hợp UX (< 2 giây)?
 [ ] Mỗi khi internal state thay đổi, có gửi display update không?
 [ ] Data ownership rõ ràng: ai own field nào trong display message?
+[ ] Có chân GPIO nào dùng chung giữa input điều khiển (button) và cảm biến an toàn (door/limit switch) không?
+[ ] Cache trạng thái ở task khác (vd UITask) có được đồng bộ khi nguồn sự thật (WashingManager) đổi không?
 ```

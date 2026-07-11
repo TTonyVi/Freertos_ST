@@ -85,7 +85,7 @@ event group.
 
 ---
 
-### Phase 5 — WashingManager Task `[IN_PROGRESS]` 7/9
+### Phase 5 — WashingManager Task `[DONE]` 9/9
 
 **Goal:** Own the state machine, coordinate actuators, and drive the display queue.
 
@@ -96,8 +96,8 @@ event group.
 - [x] `App/BSP/Inc/bsp_led.h` + `App/BSP/Src/bsp_led.c` — PD15 status LED abstraction (see TD-08)
 - [x] `App/WashingManager/Inc/washing_manager.h` — task prototype and blocking strategy documentation
 - [x] `App/WashingManager/Src/washing_manager.c` — state-dependent blocking loop, SM callbacks, BSP control, display queue updates
-- [ ] `WashingManagerTask` registered with `xTaskCreate()` in `main.c`
-- [ ] Blink placeholder tasks removed from `main.c`
+- [x] `WashingManagerTask` registered with `xTaskCreate()` in `main.c`
+- [x] Blink placeholder tasks removed from `main.c`
 
 ---
 
@@ -247,3 +247,48 @@ All four software timers (`xWashTimer`, `xDrainTimer`, `xSpinTimer`,
 `EVT_TIMEOUT`. WashingManager identifies which timer fired by reading the
 current SM state — no timer ID needed. This is simpler and equally correct
 because only one timer runs at any given time.
+
+### TD-11 — Door Sensor Decoupled from PA0 (Bug #8 fix, see HARDWARE_BUGS.md)
+
+`BSP_Sensor_IsDoorClosed()` no longer reads PA0. First on-hardware manual
+test of Phase 5 (long-press to start Wash) showed the machine entering
+`FILL_WATER` then immediately faulting to `ERROR` on button release — PA0
+was shared between `bsp_button.c` (gesture timing, requires release to fire
+long-press) and `bsp_sensor.c` (door simulation, release read as "door
+open"). Releasing the button to confirm a command always looked like a
+door-open fault within one `SensorTask` poll (100 ms).
+
+Fix: door state is now a plain static flag (`s_doorClosed`, default `1` =
+closed), matching how `s_waterFull` already simulates the water sensor —
+changed via debugger Live Expressions while the target runs, no GPIO
+involved. PA0 is now owned exclusively by `bsp_button.c`.
+
+Files changed: `App/BSP/Src/bsp_sensor.c`, `App/BSP/Inc/bsp_sensor.h`.
+
+Verified after fix: pressing B1 to start Wash now reaches `FILL_WATER` and
+stays there for the full 10 s (`WASH_FILL_DURATION_MS`) before timing out to
+`ERROR` — the correct designed behavior when `s_waterFull` is never set.
+
+**What to learn:** never let a UI input pin double as a safety-sensor input
+— the gesture that confirms a command (button release) and the gesture that
+signals danger (door release) can require opposite readings of the same
+edge. Simulate ungated sensors as debugger-writable variables, not by
+repurposing an existing physical pin.
+
+### Known open issue — Bug #9 (see HARDWARE_BUGS.md)
+
+`UITask`'s `s_statusCache` is initialized once to `"IDLE"` and never updated,
+so a short-press during a running cycle briefly overwrites the OLED status
+line with a stale `"IDLE"`. Identified during the same test session as
+TD-11; not yet fixed — decision on approach still pending.
+
+### Known open issue — Bug #10 (see HARDWARE_BUGS.md)
+
+After a full Wash cycle reaches `FINISH`, the machine stops responding to
+button input entirely. `UITask` never sends `CMD_RESET` — its long-press
+handler only ever builds `CMD_START_WASH`/`CMD_START_SPIN`, which the SM
+silently ignores while in `FINISH`/`ERROR` (no matching transition row).
+Recommended fix (not yet applied, pending confirmation): have
+`Manager_HandleCommand()` check `WashingSM_GetState()` first and treat any
+incoming command as `WASH_EVT_RESET` while in `FINISH`/`ERROR`, keeping
+`UITask` unaware of machine state as originally designed.
