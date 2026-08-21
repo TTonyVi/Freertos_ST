@@ -12,7 +12,10 @@ Mô tả: **Ai** giao tiếp với **ai** thông qua **cơ chế nào**.
 ```mermaid
 flowchart TD
     %% --- Hardware layer ---
-    HW_BTN["B1 Button (PA0)"]
+    HW_BTN["B1 Button (PA0)\nShort press: navigate"]
+    HW_PE1["Start Button (PE1)\nPress: confirm/start"]
+    HW_PD5["Door Btn (PD5)\nToggle door"]
+    HW_PD6["Water Btn (PD6)\nToggle water"]
     HW_OLED["OLED SSD1306 (I2C)"]
     HW_MOTOR["Motor GPIO (PD12)"]
     HW_INLET["Inlet Valve GPIO (PD13)"]
@@ -20,7 +23,8 @@ flowchart TD
     HW_LED["Status LED GPIO (PD15)"]
 
     %% --- ISR layer ---
-    ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce + classify\n[ISR CONTEXT]"]
+    ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce \u2192 SHORT_PRESS only\n[ISR CONTEXT]"]
+    ISR_PE1["EXTI1_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge \u2192 LONG_PRESS\n[ISR CONTEXT]"]
     ISR_TMR["Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]"]
 
     %% --- Queue / Event objects ---
@@ -43,7 +47,9 @@ flowchart TD
 
     %% --- Connections ---
     HW_BTN -->|"RISING/FALLING edge"| ISR_BTN
-    ISR_BTN -->|"xQueueSendFromISR"| Q_BTN
+    ISR_BTN -->|"xQueueSendFromISR\nBTN_EVENT_SHORT_PRESS"| Q_BTN
+    HW_PE1 -->|"FALLING edge EXTI1"| ISR_PE1
+    ISR_PE1 -->|"xQueueSendFromISR\nBTN_EVENT_LONG_PRESS"| Q_BTN
     Q_BTN -->|"xQueueReceive\nblocks"| UI
     UI -->|"xQueueSend"| Q_CMD
 
@@ -52,6 +58,8 @@ flowchart TD
     Q_DSP -->|"xQueueReceive\nblocks"| OLED
     OLED -->|"I2C write"| HW_OLED
 
+    HW_PD5 -->|"Polled 100 ms\nBSP_Sensor_Poll()"| SENSOR
+    HW_PD6 -->|"Polled 100 ms\nBSP_Sensor_Poll()"| SENSOR
     SENSOR -->|"xEventGroupSetBits\nDOOR_CLOSED / WATER_FULL"| EG
     SENSOR -->|"xEventGroupSetBits\nEVT_ERROR (door open)"| EG
     EG -->|"xEventGroupWaitBits\nblocks mid-cycle"| WASH
@@ -77,6 +85,7 @@ stateDiagram-v2
 
     FILL_WATER --> WASHING : EVT_WATER_FULL\n[xSystemEvents Bit1]
     FILL_WATER --> ERROR   : EVT_TIMEOUT (10 s)\n[xFillTimeoutTimer → Bit2]
+    FILL_WATER --> ERROR   : EVT_ERROR\n[xSystemEvents Bit4]
 
     WASHING --> DRAIN : EVT_TIMEOUT (20 s)\n[xWashTimer → Bit2]
     WASHING --> ERROR : EVT_ERROR\n[xSystemEvents Bit4]
@@ -87,8 +96,8 @@ stateDiagram-v2
     SPIN --> FINISH : EVT_TIMEOUT (10 s)\n[xSpinTimer → Bit2]
     SPIN --> ERROR  : EVT_ERROR\n[xSystemEvents Bit4]
 
-    FINISH --> IDLE : CMD_RESET\n[xCommandQueue]
-    ERROR  --> IDLE : CMD_RESET\n[xCommandQueue]
+    FINISH --> IDLE : CMD_RESET / Start press\n[xCommandQueue / mapped in WashMgr]
+    ERROR  --> IDLE : CMD_RESET / Start press\n[xCommandQueue / mapped in WashMgr]
 
     note right of FILL_WATER
         Inlet valve OPEN
@@ -122,12 +131,13 @@ stateDiagram-v2
 
 ## 3. Kịch bản A — Full Wash Cycle (Bình thường)
 
-**Trigger:** User long-press button khi cursor ở "Wash"
+**Trigger:** User nhấn PE1 (Start button) khi cursor ở "Wash"
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant ISR  as EXTI0 ISR
+    participant ISR0 as EXTI0 ISR (PA0)
+    participant ISR1 as EXTI1 ISR (PE1)
     participant UI   as UITask
     participant WASH as WashingManager
     participant SENS as SensorTask
@@ -138,22 +148,22 @@ sequenceDiagram
     WASH->>OLED: xQueueSend(DisplayMsg "IDLE")<br/>menuIndex=0
     OLED->>OLED: Render: title + Wash/Spin menu + "IDLE"
 
-    Note over User,OLED: ── User điều hướng menu (short press) ──
-    User->>ISR: Nhấn nhanh (< 1500 ms)
-    ISR->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
+    Note over User,OLED: ── User điều hướng menu (short press PA0) ──
+    User->>ISR0: Nhấn nhanh PA0
+    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
     UI->>UI: menuIndex = 1 (Spin)
     UI->>OLED: xQueueSend(DisplayMsg menuIndex=1 "IDLE")
     OLED->>OLED: Render: cursor trên "Spin"
 
-    User->>ISR: Nhấn nhanh lần 2
-    ISR->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
+    User->>ISR0: Nhấn nhanh PA0 lần 2
+    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
     UI->>UI: menuIndex = 0 (Wash)
     UI->>OLED: xQueueSend(DisplayMsg menuIndex=0 "IDLE")
     OLED->>OLED: Render: cursor trở về "Wash"
 
-    Note over User,OLED: ── User xác nhận (long press ≥ 1500 ms) ──
-    User->>ISR: Giữ nút ≥ 1500 ms rồi thả
-    ISR->>UI: xQueueSendFromISR(BTN_EVENT_LONG_PRESS)
+    Note over User,OLED: ── User xác nhận (nhấn PE1) ──
+    User->>ISR1: Nhấn PE1 (Start button)
+    ISR1->>UI: xQueueSendFromISR(BTN_EVENT_LONG_PRESS)
     UI->>WASH: xQueueSend(CMD_START_WASH, WASH_MODE_WASH, menuIndex=0)
 
     Note over User,OLED: ── FILL_WATER phase ──
@@ -167,6 +177,7 @@ sequenceDiagram
     Note right of WASH: BLOCKED — waiting for water
 
     loop Polling every 100 ms
+        SENS->>SENS: BSP_Sensor_Poll() → PD6 toggle detected
         SENS->>SENS: BSP_Sensor_IsWaterFull() → true
         SENS->>WASH: xEventGroupSetBits(EVT_WATER_FULL)
     end
@@ -207,13 +218,15 @@ sequenceDiagram
     Note over User,OLED: ── FINISH ──
     WASH->>WASH: BSP_Motor_Stop() + BSP_LED_Off()
     WASH->>WASH: xEventGroupSetBits(EVT_FINISHED)
+    WASH->>WASH: xQueueReset(xCommandQueue) (clear stale commands)
     WASH->>OLED: xQueueSend(DisplayMsg "FINISHED")
     OLED->>OLED: Render "FINISHED"
 
-    Note over User,OLED: ── User acknowledge ──
-    User->>ISR: Long press
-    ISR->>UI: BTN_EVENT_LONG_PRESS
-    UI->>WASH: xQueueSend(CMD_RESET)
+    Note over User,OLED: ── User acknowledge (nhấn PE1) ──
+    User->>ISR1: Nhấn PE1
+    ISR1->>UI: BTN_EVENT_LONG_PRESS
+    UI->>WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
+    WASH->>WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH->>WASH: SM: FINISH → IDLE
     WASH->>OLED: xQueueSend(DisplayMsg "IDLE")
 ```
@@ -222,17 +235,19 @@ sequenceDiagram
 
 ## 4. Kịch bản B — Spin-Only Cycle
 
-**Trigger:** User long-press khi cursor ở "Spin"
+**Trigger:** User nhấn PE1 (Start) khi cursor ở "Spin"
 
 ```mermaid
 sequenceDiagram
     actor User
+    participant ISR1 as EXTI1 ISR (PE1)
     participant UI   as UITask
     participant WASH as WashingManager
     participant TMR  as Timer Callback
     participant OLED as OLEDTask
 
-    User->>UI: Long press (cursor = Spin)
+    User->>ISR1: Nhấn PE1 (cursor = Spin)
+    ISR1->>UI: BTN_EVENT_LONG_PRESS
     UI->>WASH: xQueueSend(CMD_START_SPIN, WASH_MODE_SPIN, menuIndex=1)
 
     Note over WASH: SM: IDLE → SPIN<br/>(skip FILL_WATER, WASHING, DRAIN)
@@ -251,8 +266,10 @@ sequenceDiagram
     WASH->>WASH: xEventGroupSetBits(EVT_FINISHED)
     WASH->>OLED: xQueueSend(DisplayMsg "FINISHED")
 
-    User->>UI: Long press
-    UI->>WASH: CMD_RESET
+    User->>ISR1: Nhấn PE1
+    ISR1->>UI: BTN_EVENT_LONG_PRESS
+    UI->>WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
+    WASH->>WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH->>WASH: SM: FINISH → IDLE
     WASH->>OLED: xQueueSend(DisplayMsg "IDLE")
 ```
@@ -290,15 +307,16 @@ sequenceDiagram
     WASH->>WASH: BSP_Valve_Close(DRAIN)
     WASH->>WASH: BSP_LED_Off()
     WASH->>EG: xEventGroupSetBits(EVT_ERROR)
+    WASH->>WASH: xQueueReset(xCommandQueue) (clear stale commands)
     WASH->>OLED: xQueueSend(DisplayMsg "ERROR")
     OLED->>OLED: Render "ERROR"
 
     Note over WASH: SM blocks on xCommandQueue — chờ CMD_RESET
     WASH->>WASH: xQueueReceive(xCommandQueue, portMAX_DELAY)
 
-    Note over SENS: User đóng cửa lại + reset
+    Note over SENS: User đóng cửa lại (nhấn PD5) + nhấn PE1 để reset
     actor User
-    User->>WASH: Long press → CMD_RESET
+    User->>WASH: PE1 → BTN_EVENT_LONG_PRESS → CMD_RESET
     WASH->>WASH: SM: ERROR → IDLE
     WASH->>EG: xEventGroupClearBits(EVT_FINISHED | EVT_ERROR)
     WASH->>OLED: xQueueSend(DisplayMsg "IDLE")
@@ -331,12 +349,12 @@ flowchart TD
     H --> I{"xQueueReceive\nxCommandQueue\n[BLOCKED]"}
     I -->|CMD_RESET| J([IDLE])
 
-    style B fill:#d4edda,stroke:#28a745
-    style C fill:#fff3cd,stroke:#ffc107
-    style H fill:#f8d7da,stroke:#dc3545
-    style D fill:#d4edda,stroke:#28a745
-    style E fill:#f8d7da,stroke:#dc3545
-    style F fill:#f8d7da,stroke:#dc3545
+    style B fill:#1b4332,stroke:#2ea043,color:#ffffff
+    style C fill:#4a3b00,stroke:#d4a72c,color:#ffffff
+    style H fill:#5c1d24,stroke:#f85149,color:#ffffff
+    style D fill:#1b4332,stroke:#2ea043,color:#ffffff
+    style E fill:#5c1d24,stroke:#f85149,color:#ffffff
+    style F fill:#5c1d24,stroke:#f85149,color:#ffffff
 ```
 
 ---
@@ -345,24 +363,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    HW(["B1 Button PA0\nPhysical press"])
+    PA0(["PA0 — B1 Button\nNavigate menu"])
+    PE1(["PE1 — Start Button\nConfirm / Start"])
 
-    HW -->|"RISING edge\nPA0 = HIGH"| ISR1
+    PA0 -->|"RISING edge → record time\nFALLING edge → measure duration"| ISR0
 
-    ISR1["EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nHAL_GPIO_ReadPin = HIGH\ns_pressStartMs = HAL_GetTick()\ns_pressed = 1"]
+    ISR0["EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nduration = HAL_GetTick() - s_pressStartMs"]
 
-    ISR1 -->|"returns from ISR\nwaits for release"| WAIT((" "))
+    ISR0 --> DEB{"duration < 50ms?"}
+    DEB -->|YES| NOISE["Noise — ignore"]
+    DEB -->|NO = Short Press| S_SEND["xQueueSendFromISR\n(BTN_EVENT_SHORT_PRESS)\n+ portYIELD_FROM_ISR"]
 
-    WAIT -->|"FALLING edge\nPA0 = LOW"| ISR2
+    PE1 -->|"FALLING edge (press)"| ISR1
 
-    ISR2["EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nHAL_GPIO_ReadPin = LOW\nduration = HAL_GetTick() - s_pressStartMs"]
+    ISR1["EXTI1_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press"]
 
-    ISR2 --> DEB{"duration < 50ms?"}
-    DEB -->|YES| NOISE["Noise — ignore\nNo queue send"]
-    DEB -->|NO| LONG{"duration ≥ 1500ms?"}
-
-    LONG -->|YES = Long Press| L_SEND["xQueueSendFromISR\n(BTN_EVENT_LONG_PRESS)\n+ portYIELD_FROM_ISR"]
-    LONG -->|NO = Short Press| S_SEND["xQueueSendFromISR\n(BTN_EVENT_SHORT_PRESS)\n+ portYIELD_FROM_ISR"]
+    ISR1 --> L_SEND["xQueueSendFromISR\n(BTN_EVENT_LONG_PRESS)\n+ portYIELD_FROM_ISR"]
 
     L_SEND --> UI_RECV
     S_SEND --> UI_RECV
@@ -386,11 +402,11 @@ flowchart TD
 
     CURSOR --> OLED_UPD["OLEDTask\nxQueueReceive(xDisplayQueue)\nRender cursor move"]
 
-    style NOISE fill:#f8d7da,stroke:#dc3545
-    style L_SEND fill:#cce5ff,stroke:#004085
-    style S_SEND fill:#cce5ff,stroke:#004085
-    style CURSOR fill:#d4edda,stroke:#28a745
-    style SEND_CMD fill:#cce5ff,stroke:#004085
+    style NOISE fill:#5c1d24,stroke:#f85149,color:#ffffff
+    style L_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
+    style S_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
+    style CURSOR fill:#1b4332,stroke:#2ea043,color:#ffffff
+    style SEND_CMD fill:#0d3b66,stroke:#388bfd,color:#ffffff
 ```
 
 ---
@@ -423,9 +439,9 @@ flowchart LR
     WAIT_T --> PROC
     PROC -->|"onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)"| ENA
 
-    style CB fill:#fff3cd,stroke:#ffc107
-    style BIT fill:#d4edda,stroke:#28a745
-    style WAIT_T fill:#cce5ff,stroke:#004085
+    style CB fill:#4a3b00,stroke:#d4a72c,color:#ffffff
+    style BIT fill:#1b4332,stroke:#2ea043,color:#ffffff
+    style WAIT_T fill:#0d3b66,stroke:#388bfd,color:#ffffff
 ```
 
 ---
@@ -437,7 +453,7 @@ Bảng này dùng để debug: nếu chương trình treo, xem task nào đang b
 ```mermaid
 flowchart TD
     subgraph "Trong mỗi phase, WashingManager block tại:"
-        IDLE_B["STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user long-press"]
+        IDLE_B["STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PE1 (Start/Confirm)"]
 
         FILL_B["STATE: FILL_WATER\n──────────────────────\nxEventGroupWaitBits\n(EVT_WATER_FULL OR EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ sensor OR timer 10s OR cửa mở"]
 
@@ -459,7 +475,7 @@ flowchart TD
 
 **Debug tip:** Nếu màn hình không update → OLEDTask đang chờ message ở xDisplayQueue. Kiểm tra WashingManager có gọi `Manager_PostDisplay()` không.
 
-**Debug tip:** Nếu machine không start khi long-press → WashingManager đang block đúng chỗ không? Dùng SEGGER SystemView xem task state.
+**Debug tip:** Nếu machine không start khi nhấn PE1 → kiểm tra EXTI1 đã được enable chưa? `BSP_StartButton_Init()` được gọi sau `BSP_Button_Init()` trong UITask.
 
 ---
 
@@ -470,24 +486,26 @@ Pixel coordinates: x=0..127 (left→right), y=0..63 (top→bottom)
 Font: 6×8 px per character → 21 chars/row, 8 rows max
 
 ┌────────────────────────────────────────────┐  y=0
-│ Washing Machine                            │  Row 0 (y pixel 0–7)
-├────────────────────────────────────────────┤  y=8
-│ > Wash    ← menuIndex == 0                 │  Row 1 (y pixel 8–15)
-│   Wash    ← menuIndex != 0                 │
+│ (empty — always black)                     │  Rows 0–1 (y pixel 0–15)
 ├────────────────────────────────────────────┤  y=16
-│ > Spin    ← menuIndex == 1                 │  Row 2 (y pixel 16–23)
-│   Spin    ← menuIndex != 1                 │
+│   Washing Machine                          │  Row 2 (y pixel 16–23)
 ├────────────────────────────────────────────┤  y=24
-│ IDLE / FILL WATER / WASHING /              │  Row 3 (y pixel 24–31)
-│ DRAIN / SPINNING / FINISHED / ERROR        │
+│ > Wash    ← menuIndex == 0                 │  Row 3 (y pixel 24–31)
+│   Wash    ← menuIndex != 0                 │
 ├────────────────────────────────────────────┤  y=32
-│ (empty — always black)                     │  Rows 4–7 (y pixel 32–63)
+│ > Spin    ← menuIndex == 1                 │  Row 4 (y pixel 32–39)
+│   Spin    ← menuIndex != 1                 │
+├────────────────────────────────────────────┤  y=40
+│ IDLE / FILL WATER / WASHING /              │  Row 5 (y pixel 40–47)
+│ DRAIN / SPINNING / FINISHED / ERROR        │
+├────────────────────────────────────────────┤  y=48
+│ (empty — always black)                     │  Rows 6–7 (y pixel 48–63)
 └────────────────────────────────────────────┘  y=63
 
 Owner phân quyền:
-  Row 0: hardcoded trong oled_task.c
-  Row 1–2: menuIndex từ DisplayMsg_t (owner: UITask → truyền qua CommandMsg_t)
-  Row 3: statusText từ DisplayMsg_t (owner: WashingManager)
+  Row 2: hardcoded trong oled_task.c
+  Row 3–4: menuIndex từ DisplayMsg_t (owner: UITask → truyền qua CommandMsg_t)
+  Row 5: statusText từ DisplayMsg_t (owner: WashingManager)
 ```
 
 ---
@@ -496,7 +514,7 @@ Owner phân quyền:
 
 | Object | Type | Depth/Bits | Producer | Consumer | Mechanism |
 |--------|------|-----------|----------|----------|-----------|
-| `xButtonQueue` | Queue | 5 items | ISR (EXTI0) | UITask | `xQueueSendFromISR` / `xQueueReceive` |
+| `xButtonQueue` | Queue | 5 items | ISR EXTI0 (PA0) + ISR EXTI1 (PE1) | UITask | `xQueueSendFromISR` / `xQueueReceive` |
 | `xCommandQueue` | Queue | 5 items | UITask | WashingManager | `xQueueSend` / `xQueueReceive` |
 | `xDisplayQueue` | Queue | 5 items | WashingManager, UITask | OLEDTask | `xQueueSend` / `xQueueReceive` |
 | `xSystemEvents` | Event Group | 5 bits | SensorTask, TimerCb, WashMgr | WashingManager | `xEventGroupSetBits` / `xEventGroupWaitBits` |

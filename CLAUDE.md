@@ -63,21 +63,30 @@ Debug Tools:
 
 Inputs:
 
-* B1 User Button (PA0)
+* B1 User Button (PA0) — Short press: navigate menu
+* Start/Confirm Button (PE1, external) — Press: confirm selection / start cycle
+* Door Sensor Button (PD5, external) — Toggle: simulate door open/close
+* Water Level Button (PD6, external) — Toggle: simulate water full/empty
 
 Outputs:
 
-* OLED SSD1306 (I2C)
-* Motor GPIO
-* Water Inlet Valve GPIO
-* Drain Valve GPIO
-* Status LED GPIO
+* OLED SSD1306 (I2C1 — PB8/PB9)
+* Motor GPIO (PD12 — LD4 Green)
+* Water Inlet Valve GPIO (PD13 — LD3 Orange)
+* Drain Valve GPIO (PD14 — LD5 Red)
+* Status LED GPIO (PD15 — LD6 Blue)
 
 Simulation Signals:
 
-* Motor -> GPIO Output
-* Water Inlet Valve -> GPIO Output
-* Drain Valve -> GPIO Output
+* Motor -> PD12 GPIO Output (Logic Analyzer CH0)
+* Water Inlet Valve -> PD13 GPIO Output (Logic Analyzer CH1)
+* Drain Valve -> PD14 GPIO Output (Logic Analyzer CH2)
+* Status LED -> PD15 GPIO Output (Logic Analyzer CH3)
+
+Sensor Simulation (button-driven, no debugger needed):
+
+* Door sensor -> PD5 toggle button (default: closed)
+* Water level sensor -> PD6 toggle button (default: empty)
 
 All output signals should be observable using a Logic Analyzer.
 

@@ -258,37 +258,76 @@ long-press) and `bsp_sensor.c` (door simulation, release read as "door
 open"). Releasing the button to confirm a command always looked like a
 door-open fault within one `SensorTask` poll (100 ms).
 
-Fix: door state is now a plain static flag (`s_doorClosed`, default `1` =
-closed), matching how `s_waterFull` already simulates the water sensor —
-changed via debugger Live Expressions while the target runs, no GPIO
-involved. PA0 is now owned exclusively by `bsp_button.c`.
+Initial fix: door state became a plain static flag (`s_doorClosed`, default
+`1` = closed), changed via debugger Live Expressions.
 
-Files changed: `App/BSP/Src/bsp_sensor.c`, `App/BSP/Inc/bsp_sensor.h`.
+Final fix (TD-12): sensors are now driven by dedicated physical buttons
+(PD5 = door, PD6 = water) — no debugger interaction needed at all.
 
-Verified after fix: pressing B1 to start Wash now reaches `FILL_WATER` and
-stays there for the full 10 s (`WASH_FILL_DURATION_MS`) before timing out to
-`ERROR` — the correct designed behavior when `s_waterFull` is never set.
+**What to learn:** never let a UI input pin double as a safety-sensor input.
+Simulate sensors via dedicated inputs, not repurposed UI pins.
 
-**What to learn:** never let a UI input pin double as a safety-sensor input
-— the gesture that confirms a command (button release) and the gesture that
-signals danger (door release) can require opposite readings of the same
-edge. Simulate ungated sensors as debugger-writable variables, not by
-repurposing an existing physical pin.
+### TD-12 — Physical Button Hardware Upgrade for Sensor & UI Simulation
+
+All simulation inputs are now driven by dedicated external push-buttons,
+eliminating the need for a debugger connection during testing.
+
+| Pin | Role | Interface | Behavior |
+|-----|------|-----------|----------|
+| PA0 | Navigate menu | EXTI0, both edges, pull-down | Short press → next menu item |
+| PE1 | Start / Confirm | EXTI1, falling edge, pull-up | Any press → start selected mode |
+| PD5 | Door sensor sim | GPIO Input, pull-up, polling 100 ms | Toggle press → open/close door |
+| PD6 | Water sensor sim | GPIO Input, pull-up, polling 100 ms | Toggle press → full/empty water |
+
+**Why EXTI for PE1, polling for PD5/PD6?**
+PE1 uses EXTI1 — no conflict with EXTI0 (PA0). Using EXTI gives immediate,
+ISR-driven response for the Start button. PD5/PD6 are toggle switches polled
+every 100 ms by SensorTask — latency is acceptable and avoids adding two
+more ISR handlers.
+
+**Why PE1 for Start instead of a second gesture on PA0?**
+Separating UI input (PA0) from confirmation (PE1) eliminates long-press
+timing complexity and makes the gesture model unambiguous. Any press on PE1
+immediately fires `BTN_EVENT_LONG_PRESS`, which UITask already handles
+to send the start command — no UITask code change required.
+
+**Default sensor states at startup:**
+- Door: CLOSED (`s_doorClosed = 1`) — machine starts in safe state
+- Water: EMPTY (`s_waterFull = 0`) — machine waits for water fill signal
+
+Files changed: `App/BSP/Inc/bsp_button.h`, `App/BSP/Src/bsp_button.c`,
+`App/BSP/Inc/bsp_sensor.h`, `App/BSP/Src/bsp_sensor.c`,
+`App/SensorTask/Src/sensor_task.c`, `Core/Src/stm32f4xx_it.c`,
+`App/UITask/Src/ui_task.c`, `Core/Src/main.c`.
 
 ### Known open issue — Bug #9 (see HARDWARE_BUGS.md)
 
 `UITask`'s `s_statusCache` is initialized once to `"IDLE"` and never updated,
 so a short-press during a running cycle briefly overwrites the OLED status
-line with a stale `"IDLE"`. Identified during the same test session as
-TD-11; not yet fixed — decision on approach still pending.
+line with a stale `"IDLE"`. Not yet fixed — decision on approach pending.
 
-### Known open issue — Bug #10 (see HARDWARE_BUGS.md)
+### Resolved issue — Bug #10 (see HARDWARE_BUGS.md)
 
-After a full Wash cycle reaches `FINISH`, the machine stops responding to
-button input entirely. `UITask` never sends `CMD_RESET` — its long-press
-handler only ever builds `CMD_START_WASH`/`CMD_START_SPIN`, which the SM
-silently ignores while in `FINISH`/`ERROR` (no matching transition row).
-Recommended fix (not yet applied, pending confirmation): have
-`Manager_HandleCommand()` check `WashingSM_GetState()` first and treat any
-incoming command as `WASH_EVT_RESET` while in `FINISH`/`ERROR`, keeping
-`UITask` unaware of machine state as originally designed.
+After a full Wash cycle reaches `FINISH`, the machine stops responding to button input entirely because `UITask` never sends `CMD_RESET`. Fixed by having `Manager_HandleCommand()` check `WashingSM_GetState()` first and interpret any incoming command as `WASH_EVT_RESET` when in `FINISH`/`ERROR` states. This keeps `UITask` unaware of machine state as originally designed.
+
+### Change Record — Syncing Code & Diagrams (2026-08-21)
+
+- **Goal:** Fix critical bugs and synchronize codebase with system diagrams.
+- **Files changed:**
+  - [`sensor_task.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/SensorTask/Src/sensor_task.c)
+  - [`washing_manager.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/WashingManager/Src/washing_manager.c)
+  - [`SYSTEM_DIAGRAMS.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/SYSTEM_DIAGRAMS.md)
+- **What changed:**
+  - Added missing call to `BSP_Sensor_Poll()` inside `SensorTask` loop.
+  - Implemented automatic mapping of incoming commands to `WASH_EVT_RESET` in `Manager_HandleCommand()` when in `FINISHED` or `ERROR` states.
+  - Added `xQueueReset(xCommandQueue)` calls in `Manager_OnEnterIdle()`, `Manager_OnEnterFinish()`, and `Manager_OnEnterError()` to clear queued commands.
+  - Updated Mermaid state diagram, OLED row coordinates (from Row 0–3 to Row 2–5), and sequence diagrams in `SYSTEM_DIAGRAMS.md` to match actual implementation.
+- **Why it changed:**
+  - Without `BSP_Sensor_Poll()`, the physical buttons for simulated sensors (PD5 and PD6) were never read, preventing water level and door state simulation.
+  - Without the reset mapping, the machine was stuck in terminal states because `UITask` could not send `CMD_RESET`.
+  - Stale command presses made while running were piling up in the command queue, causing unintended double starts or resets when the cycle completed. Resetting the queue prevents this.
+  - The diagrams were out of date and mismatched with the working codebase.
+- **What I should learn from it:**
+  - Ensure all driver/BSP polling functions are actually called in their corresponding tasks.
+  - Context-sensitive command translation inside the manager task preserves module decoupling.
+  - Keep project diagrams synchronized with the implementation to prevent documentation decay.

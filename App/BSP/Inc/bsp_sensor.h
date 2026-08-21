@@ -9,9 +9,17 @@
  *
  * No FreeRTOS dependency — safe to call from any context.
  *
- * Hardware mapping (simulation):
- *   Door sensor    : not wired; s_doorClosed defaults to 1 (closed)
- *   Water sensor   : not wired; s_waterFull defaults to 0 (empty)
+ * Hardware mapping:
+ *   Door sensor  : PD5 — external button, active-low (pull-up enabled).
+ *                  Each button press toggles s_doorClosed between 1 (closed)
+ *                  and 0 (open).
+ *   Water sensor : PD6 — external button, active-low (pull-up enabled).
+ *                  Each button press toggles s_waterFull between 0 (empty)
+ *                  and 1 (full).
+ *
+ * Why polling instead of EXTI?
+ *   PD5 uses EXTI5, PD6 uses EXTI6 — no conflict with PA0 (EXTI0).
+ *   Polling inside SensorTask (100 ms) is preferred for simplicity.
  */
 
 #ifndef APP_BSP_BSP_SENSOR_H

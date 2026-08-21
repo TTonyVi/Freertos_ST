@@ -56,22 +56,78 @@ FreeRTOS
 
 ## User Input
 
-### B1 User Button
+### B1 User Button — Navigate (PA0)
 
 GPIO:
 
 PA0
 
-Functions:
+Function:
 
 Short Press:
 
-* Change selection
+* Move selection between menu items
 
-Long Press (3 seconds):
+Note: Long press removed. Confirm/Start is handled by PE1.
+
+---
+
+### Start / Confirm Button — (PE1, external)
+
+GPIO:
+
+PE1
+
+Interface:
+
+EXTI1, falling edge, internal pull-up (button connects PE1 to GND)
+
+Function:
+
+Press:
 
 * Confirm selection
-* Start selected mode
+* Start selected wash mode
+
+---
+
+### Door Sensor Simulation Button — (PD5, external)
+
+GPIO:
+
+PD5
+
+Interface:
+
+GPIO Input, pull-up, polled every 100 ms by SensorTask
+
+Function:
+
+Toggle Press:
+
+* Odd presses: door OPEN → triggers EVT_ERROR
+* Even presses: door CLOSED → normal operation
+* Default state at startup: CLOSED
+
+---
+
+### Water Level Sensor Simulation Button — (PD6, external)
+
+GPIO:
+
+PD6
+
+Interface:
+
+GPIO Input, pull-up, polled every 100 ms by SensorTask
+
+Function:
+
+Toggle Press:
+
+* Odd presses: water FULL → machine advances from FILL_WATER to WASHING
+* Even presses: water EMPTY (no immediate action)
+* Default state at startup: EMPTY
 
 ---
 
@@ -217,11 +273,11 @@ Washing Machine
 
 Spin
 
-Short Press:
+PA0 Short Press:
 
-* Move selection
+* Move cursor to next menu item
 
-OLED:
+OLED after press:
 
 Washing Machine
 
@@ -229,9 +285,9 @@ Wash
 
 > Spin
 
-Long Press (3 seconds):
+PE1 Press (Start/Confirm):
 
-* Start selected mode
+* Start selected mode immediately (no hold required)
 
 ---
 

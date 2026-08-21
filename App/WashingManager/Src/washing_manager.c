@@ -63,6 +63,9 @@ static void Manager_OnEnterIdle(void)
     /* Clear status bits left over from a completed or reset cycle. */
     xEventGroupClearBits(xSystemEvents, EVT_FINISHED | EVT_ERROR);
 
+    /* Clear any stale commands that queued up while the machine was running. */
+    (void)xQueueReset(xCommandQueue);
+
     Manager_PostDisplay(WASH_STATE_IDLE, "IDLE");
 }
 
@@ -106,6 +109,9 @@ static void Manager_OnEnterFinish(void)
 
     xEventGroupSetBits(xSystemEvents, EVT_FINISHED);
 
+    /* Clear any stale commands that queued up while the machine was running. */
+    (void)xQueueReset(xCommandQueue);
+
     Manager_PostDisplay(WASH_STATE_FINISH, "FINISHED");
 }
 
@@ -117,6 +123,9 @@ static void Manager_OnEnterError(void)
     BSP_LED_Off();
 
     xEventGroupSetBits(xSystemEvents, EVT_ERROR);
+
+    /* Clear any stale commands that queued up while the machine was running. */
+    (void)xQueueReset(xCommandQueue);
 
     Manager_PostDisplay(WASH_STATE_ERROR, "ERROR");
 }
@@ -154,6 +163,15 @@ static void Manager_PostDisplay(WashState_t state, const char *statusText)
 static void Manager_HandleCommand(const CommandMsg_t *cmd)
 {
     s_menuIndex = cmd->menuIndex;
+
+    WashState_t currentState = WashingSM_GetState();
+    if (currentState == WASH_STATE_FINISH || currentState == WASH_STATE_ERROR)
+    {
+        /* In terminal states, interpret any command/gesture (like pressing Start)
+         * as a reset event to return to IDLE state. This resolves Bug #10. */
+        WashingSM_ProcessEvent(WASH_EVT_RESET);
+        return;
+    }
 
     switch (cmd->command)
     {

@@ -51,6 +51,7 @@ void UITask(void *pvParameters)
     (void)pvParameters;
 
     BSP_Button_Init(Button_EventCallback);
+    BSP_StartButton_Init(); /* Enable PE1 EXTI1 after callback is registered. */
 
     uint8_t       menuIndex = 0u;
     ButtonEvent_t event;

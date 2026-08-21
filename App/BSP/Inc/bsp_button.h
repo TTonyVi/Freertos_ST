@@ -1,31 +1,31 @@
 /**
  * @file    bsp_button.h
- * @brief   Button BSP — gesture detection on PA0 (B1 User Button).
+ * @brief   Button BSP — two physical buttons with separate responsibilities.
  *
- * Owns GPIO pin PA0 and EXTI0. Detects short and long press gestures
- * by measuring press duration across rising and falling EXTI edges.
- * Reports gestures via a registered callback — no FreeRTOS dependency.
+ * Button 1 — Menu Navigate (PA0, B1 on-board):
+ *   Detects short press only. Generates BTN_EVENT_SHORT_PRESS on release.
+ *   Long-press detection has been removed; PA0 is now a single-gesture input.
  *
- * Hardware mapping:
- *   Pin   : PA0
- *   EXTI  : EXTI0, both edges (rising = press, falling = release)
- *   Pull  : none (external pull-down on DISCO board)
+ *   Hardware mapping:
+ *     Pin   : PA0
+ *     EXTI  : EXTI0, both edges (rising = press, falling = release)
+ *     Pull  : none (external pull-down on DISCO board — active HIGH)
  *
- * Wiring into the ISR (stm32f4xx_it.c, USER CODE BEGIN EXTI0_IRQn 0):
+ * Button 2 — Start / Confirm (PE1, external button):
+ *   Generates BTN_EVENT_LONG_PRESS on falling edge (button press).
+ *   No duration measurement needed — any press confirms the selection.
  *
- *   void EXTI0_IRQHandler(void) {
- *       BSP_Button_IRQHandler();          // gesture detection
- *       HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);  // clears EXTI flag
- *   }
+ *   Hardware mapping:
+ *     Pin   : PE1
+ *     EXTI  : EXTI1, falling edge only
+ *     Pull  : internal pull-up (active LOW — button connects PE1 to GND)
  *
- * Callback is invoked from ISR context — the implementor must use
- * FromISR FreeRTOS variants if posting to a queue.
+ * Both ISRs route to the same xButtonQueue via the same registered callback,
+ * so UITask requires no changes: SHORT_PRESS = navigate, LONG_PRESS = start.
  *
  * Priority note:
- *   BSP_Button_Init() sets EXTI0 preempt priority to 5 so that
+ *   Both EXTI0 and EXTI1 are set to preempt priority 5 so that
  *   xQueueSendFromISR() is safe to call from the callback.
- *   FreeRTOS requires ISRs that call FromISR APIs to run at or below
- *   configMAX_SYSCALL_INTERRUPT_PRIORITY (typically mapped to priority 5).
  */
 
 #ifndef APP_BSP_BSP_BUTTON_H
@@ -40,30 +40,45 @@
 typedef void (*BSP_Button_EventCb_t)(ButtonEvent_t event);
 
 /**
- * @brief  Configure PA0 for both-edge EXTI and register the event callback.
+ * @brief  Configure PA0 for short-press detection and register the callback.
  *
  * Reconfigures PA0 from rising-only (CubeMX default) to rising + falling
- * so that press duration can be measured.
+ * so that release can be detected. Only SHORT_PRESS is generated.
  * Sets EXTI0 preempt priority to 5 (FreeRTOS-safe).
  *
- * @param  callback  Function called on each detected gesture. May be NULL
- *                   (disables event reporting — useful during early bring-up).
+ * @param  callback  Function called on short press. May be NULL.
  */
 void BSP_Button_Init(BSP_Button_EventCb_t callback);
 
 /**
- * @brief  Process one EXTI edge event.
+ * @brief  Process one EXTI0 edge event (PA0 — Menu Navigate).
  *
- * Must be called at the start of EXTI0_IRQHandler(), before
- * HAL_GPIO_EXTI_IRQHandler() clears the pending bit.
+ * Must be called at the start of EXTI0_IRQHandler().
  *
  * Behaviour:
  *   Rising edge  (PA0 HIGH) → records press start timestamp.
- *   Falling edge (PA0 LOW)  → computes duration:
- *     duration < BUTTON_DEBOUNCE_MS            → ignored (noise)
- *     duration < BUTTON_LONG_PRESS_MS          → callback(BTN_EVENT_SHORT_PRESS)
- *     duration >= BUTTON_LONG_PRESS_MS         → callback(BTN_EVENT_LONG_PRESS)
+ *   Falling edge (PA0 LOW)  → if duration >= BUTTON_DEBOUNCE_MS
+ *                              → callback(BTN_EVENT_SHORT_PRESS)
  */
 void BSP_Button_IRQHandler(void);
+
+/**
+ * @brief  Configure PE1 for Start/Confirm press detection.
+ *
+ * Configures PE1 as falling-edge EXTI with internal pull-up.
+ * Reuses the same callback registered in BSP_Button_Init().
+ * Sets EXTI1 preempt priority to 5 (FreeRTOS-safe).
+ *
+ * Call after BSP_Button_Init() so the callback is already registered.
+ */
+void BSP_StartButton_Init(void);
+
+/**
+ * @brief  Process one EXTI1 edge event (PE1 — Start/Confirm).
+ *
+ * Must be called at the start of EXTI1_IRQHandler().
+ * Fires callback(BTN_EVENT_LONG_PRESS) on every falling edge.
+ */
+void BSP_StartButton_IRQHandler(void);
 
 #endif /* APP_BSP_BSP_BUTTON_H */
