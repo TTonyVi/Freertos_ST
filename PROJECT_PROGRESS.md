@@ -331,3 +331,26 @@ After a full Wash cycle reaches `FINISH`, the machine stops responding to button
   - Ensure all driver/BSP polling functions are actually called in their corresponding tasks.
   - Context-sensitive command translation inside the manager task preserves module decoupling.
   - Keep project diagrams synchronized with the implementation to prevent documentation decay.
+
+### Change Record — Refactoring Button Events (2026-08-21)
+
+- **Goal:** Rename outdated button event enums to match current decoupled hardware setup.
+- **Files changed:**
+  - [`app_types.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/Common/Inc/app_types.h)
+  - [`bsp_button.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/BSP/Inc/bsp_button.h)
+  - [`bsp_button.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/BSP/Src/bsp_button.c)
+  - [`ui_task.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/UITask/Src/ui_task.c)
+  - [`SYSTEM_DIAGRAMS.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/SYSTEM_DIAGRAMS.md)
+  - [`SYSTEM_DIAGRAMS.html`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/SYSTEM_DIAGRAMS.html)
+  - [`LEARNING_NOTES.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/LEARNING_NOTES.md)
+  - [`HARDWARE_BUGS.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/HARDWARE_BUGS.md)
+- **What changed:**
+  - Renamed `BTN_EVENT_SHORT_PRESS` to `BTN_EVENT_NAVIGATE`.
+  - Renamed `BTN_EVENT_LONG_PRESS` to `BTN_EVENT_CONFIRM`.
+  - Updated all C source files, header files, and markdown/HTML documentation to use the new names.
+- **Why it changed:**
+  - When buttons were decoupled (TD-12), the long-press duration calculation on PA0 was removed. PE1 became a dedicated Start/Confirm button.
+  - Keeping "SHORT_PRESS" and "LONG_PRESS" in code was misleading, as PE1 detects simple falling edges immediately (not long presses), and PA0 only navigates.
+- **What I should learn from it:**
+  - Code names should strictly reflect physical behavior and domain model realities to prevent cognitive load and technical debt.
+  - Maintain documentation consistency across all formats (Markdown, HTML, learning logs) when performing codebase-wide refactoring.

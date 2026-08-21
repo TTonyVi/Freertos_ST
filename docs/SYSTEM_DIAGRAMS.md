@@ -23,8 +23,8 @@ flowchart TD
     HW_LED["Status LED GPIO (PD15)"]
 
     %% --- ISR layer ---
-    ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce \u2192 SHORT_PRESS only\n[ISR CONTEXT]"]
-    ISR_PE1["EXTI1_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge \u2192 LONG_PRESS\n[ISR CONTEXT]"]
+    ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce \u2192 NAVIGATE only\n[ISR CONTEXT]"]
+    ISR_PE1["EXTI1_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge \u2192 CONFIRM\n[ISR CONTEXT]"]
     ISR_TMR["Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]"]
 
     %% --- Queue / Event objects ---
@@ -47,9 +47,9 @@ flowchart TD
 
     %% --- Connections ---
     HW_BTN -->|"RISING/FALLING edge"| ISR_BTN
-    ISR_BTN -->|"xQueueSendFromISR\nBTN_EVENT_SHORT_PRESS"| Q_BTN
+    ISR_BTN -->|"xQueueSendFromISR\nBTN_EVENT_NAVIGATE"| Q_BTN
     HW_PE1 -->|"FALLING edge EXTI1"| ISR_PE1
-    ISR_PE1 -->|"xQueueSendFromISR\nBTN_EVENT_LONG_PRESS"| Q_BTN
+    ISR_PE1 -->|"xQueueSendFromISR\nBTN_EVENT_CONFIRM"| Q_BTN
     Q_BTN -->|"xQueueReceive\nblocks"| UI
     UI -->|"xQueueSend"| Q_CMD
 
@@ -150,20 +150,20 @@ sequenceDiagram
 
     Note over User,OLED: ── User điều hướng menu (short press PA0) ──
     User->>ISR0: Nhấn nhanh PA0
-    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
+    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
     UI->>UI: menuIndex = 1 (Spin)
     UI->>OLED: xQueueSend(DisplayMsg menuIndex=1 "IDLE")
     OLED->>OLED: Render: cursor trên "Spin"
 
     User->>ISR0: Nhấn nhanh PA0 lần 2
-    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_SHORT_PRESS)
+    ISR0->>UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
     UI->>UI: menuIndex = 0 (Wash)
     UI->>OLED: xQueueSend(DisplayMsg menuIndex=0 "IDLE")
     OLED->>OLED: Render: cursor trở về "Wash"
 
     Note over User,OLED: ── User xác nhận (nhấn PE1) ──
     User->>ISR1: Nhấn PE1 (Start button)
-    ISR1->>UI: xQueueSendFromISR(BTN_EVENT_LONG_PRESS)
+    ISR1->>UI: xQueueSendFromISR(BTN_EVENT_CONFIRM)
     UI->>WASH: xQueueSend(CMD_START_WASH, WASH_MODE_WASH, menuIndex=0)
 
     Note over User,OLED: ── FILL_WATER phase ──
@@ -224,7 +224,7 @@ sequenceDiagram
 
     Note over User,OLED: ── User acknowledge (nhấn PE1) ──
     User->>ISR1: Nhấn PE1
-    ISR1->>UI: BTN_EVENT_LONG_PRESS
+    ISR1->>UI: BTN_EVENT_CONFIRM
     UI->>WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH->>WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH->>WASH: SM: FINISH → IDLE
@@ -247,7 +247,7 @@ sequenceDiagram
     participant OLED as OLEDTask
 
     User->>ISR1: Nhấn PE1 (cursor = Spin)
-    ISR1->>UI: BTN_EVENT_LONG_PRESS
+    ISR1->>UI: BTN_EVENT_CONFIRM
     UI->>WASH: xQueueSend(CMD_START_SPIN, WASH_MODE_SPIN, menuIndex=1)
 
     Note over WASH: SM: IDLE → SPIN<br/>(skip FILL_WATER, WASHING, DRAIN)
@@ -267,7 +267,7 @@ sequenceDiagram
     WASH->>OLED: xQueueSend(DisplayMsg "FINISHED")
 
     User->>ISR1: Nhấn PE1
-    ISR1->>UI: BTN_EVENT_LONG_PRESS
+    ISR1->>UI: BTN_EVENT_CONFIRM
     UI->>WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH->>WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH->>WASH: SM: FINISH → IDLE
@@ -316,7 +316,7 @@ sequenceDiagram
 
     Note over SENS: User đóng cửa lại (nhấn PD5) + nhấn PE1 để reset
     actor User
-    User->>WASH: PE1 → BTN_EVENT_LONG_PRESS → CMD_RESET
+    User->>WASH: PE1 → BTN_EVENT_CONFIRM → CMD_RESET
     WASH->>WASH: SM: ERROR → IDLE
     WASH->>EG: xEventGroupClearBits(EVT_FINISHED | EVT_ERROR)
     WASH->>OLED: xQueueSend(DisplayMsg "IDLE")
@@ -372,22 +372,22 @@ flowchart TD
 
     ISR0 --> DEB{"duration < 50ms?"}
     DEB -->|YES| NOISE["Noise — ignore"]
-    DEB -->|NO = Short Press| S_SEND["xQueueSendFromISR\n(BTN_EVENT_SHORT_PRESS)\n+ portYIELD_FROM_ISR"]
+    DEB -->|NO = Navigate| S_SEND["xQueueSendFromISR\n(BTN_EVENT_NAVIGATE)\n+ portYIELD_FROM_ISR"]
 
     PE1 -->|"FALLING edge (press)"| ISR1
 
     ISR1["EXTI1_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press"]
 
-    ISR1 --> L_SEND["xQueueSendFromISR\n(BTN_EVENT_LONG_PRESS)\n+ portYIELD_FROM_ISR"]
+    ISR1 --> L_SEND["xQueueSendFromISR\n(BTN_EVENT_CONFIRM)\n+ portYIELD_FROM_ISR"]
 
     L_SEND --> UI_RECV
     S_SEND --> UI_RECV
 
     UI_RECV["UITask\nxQueueReceive\n(blocks until event)"]
 
-    UI_RECV -->|BTN_EVENT_SHORT_PRESS| CURSOR["menuIndex++\n% MENU_ITEM_COUNT\n────────────────────\nxQueueSend(xDisplayQueue)\n{ menuIndex, s_statusCache }"]
+    UI_RECV -->|BTN_EVENT_NAVIGATE| CURSOR["menuIndex++\n% MENU_ITEM_COUNT\n────────────────────\nxQueueSend(xDisplayQueue)\n{ menuIndex, s_statusCache }"]
 
-    UI_RECV -->|BTN_EVENT_LONG_PRESS| CMD_BUILD{"menuIndex == 0?"}
+    UI_RECV -->|BTN_EVENT_CONFIRM| CMD_BUILD{"menuIndex == 0?"}
 
     CMD_BUILD -->|"YES (Wash)"| WASH_CMD["cmd = { CMD_START_WASH\nWASH_MODE_WASH\nmenuIndex }"]
     CMD_BUILD -->|"NO (Spin)"| SPIN_CMD["cmd = { CMD_START_SPIN\nWASH_MODE_SPIN\nmenuIndex }"]

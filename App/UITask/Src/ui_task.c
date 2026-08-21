@@ -60,7 +60,7 @@ void UITask(void *pvParameters)
     {
         xQueueReceive(xButtonQueue, &event, portMAX_DELAY);
 
-        if (event == BTN_EVENT_SHORT_PRESS)
+        if (event == BTN_EVENT_NAVIGATE)
         {
             menuIndex = (uint8_t)((menuIndex + 1u) % MENU_ITEM_COUNT);
 
@@ -71,7 +71,7 @@ void UITask(void *pvParameters)
             disp.statusText[sizeof(disp.statusText) - 1u] = '\0';
             xQueueSend(xDisplayQueue, &disp, 0);
         }
-        else if (event == BTN_EVENT_LONG_PRESS)
+        else if (event == BTN_EVENT_CONFIRM)
         {
             CommandMsg_t cmd;
             cmd.menuIndex = menuIndex;

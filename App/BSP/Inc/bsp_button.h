@@ -3,7 +3,7 @@
  * @brief   Button BSP — two physical buttons with separate responsibilities.
  *
  * Button 1 — Menu Navigate (PA0, B1 on-board):
- *   Detects short press only. Generates BTN_EVENT_SHORT_PRESS on release.
+ *   Detects short press only. Generates BTN_EVENT_NAVIGATE on release.
  *   Long-press detection has been removed; PA0 is now a single-gesture input.
  *
  *   Hardware mapping:
@@ -11,8 +11,7 @@
  *     EXTI  : EXTI0, both edges (rising = press, falling = release)
  *     Pull  : none (external pull-down on DISCO board — active HIGH)
  *
- * Button 2 — Start / Confirm (PE1, external button):
- *   Generates BTN_EVENT_LONG_PRESS on falling edge (button press).
+ *   Generates BTN_EVENT_CONFIRM on falling edge (button press).
  *   No duration measurement needed — any press confirms the selection.
  *
  *   Hardware mapping:
@@ -21,7 +20,7 @@
  *     Pull  : internal pull-up (active LOW — button connects PE1 to GND)
  *
  * Both ISRs route to the same xButtonQueue via the same registered callback,
- * so UITask requires no changes: SHORT_PRESS = navigate, LONG_PRESS = start.
+ * so UITask requires no changes: NAVIGATE = navigate, CONFIRM = start.
  *
  * Priority note:
  *   Both EXTI0 and EXTI1 are set to preempt priority 5 so that
@@ -35,7 +34,7 @@
 
 /**
  * @brief  Callback type invoked from ISR context when a gesture is detected.
- * @param  event  BTN_EVENT_SHORT_PRESS or BTN_EVENT_LONG_PRESS.
+ * @param  event  BTN_EVENT_NAVIGATE or BTN_EVENT_CONFIRM.
  */
 typedef void (*BSP_Button_EventCb_t)(ButtonEvent_t event);
 
@@ -58,7 +57,7 @@ void BSP_Button_Init(BSP_Button_EventCb_t callback);
  * Behaviour:
  *   Rising edge  (PA0 HIGH) → records press start timestamp.
  *   Falling edge (PA0 LOW)  → if duration >= BUTTON_DEBOUNCE_MS
- *                              → callback(BTN_EVENT_SHORT_PRESS)
+ *                              → callback(BTN_EVENT_NAVIGATE)
  */
 void BSP_Button_IRQHandler(void);
 
@@ -77,7 +76,7 @@ void BSP_StartButton_Init(void);
  * @brief  Process one EXTI1 edge event (PE1 — Start/Confirm).
  *
  * Must be called at the start of EXTI1_IRQHandler().
- * Fires callback(BTN_EVENT_LONG_PRESS) on every falling edge.
+ * Fires callback(BTN_EVENT_CONFIRM) on every falling edge.
  */
 void BSP_StartButton_IRQHandler(void);
 

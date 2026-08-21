@@ -4,11 +4,10 @@
  *
  * PA0 (B1 on-board) — Menu Navigate:
  *   Short press only. Detects rising then falling edge, measures duration,
- *   fires BTN_EVENT_SHORT_PRESS if duration >= BUTTON_DEBOUNCE_MS.
+ *   fires BTN_EVENT_NAVIGATE if duration >= BUTTON_DEBOUNCE_MS.
  *   Long-press detection removed — PA0 is a single-gesture input.
  *
- * PE1 (external button) — Start / Confirm:
- *   Fires BTN_EVENT_LONG_PRESS on every falling edge (button press).
+ *   Fires BTN_EVENT_CONFIRM on every falling edge (button press).
  *   No duration measurement. Internal pull-up — button connects PE1 to GND.
  *   Uses EXTI1 (no conflict with EXTI0 on PA0).
  */
@@ -33,6 +32,29 @@ static uint8_t              s_pressed      = 0u;
 
 /* --------------------------------------------------------------------------
  * Public API — PA0 Menu Navigate button
+ * -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+ * Public API — PA0 Menu Navigate button
+ * --------------------------------------------------------------------------
+ *
+ * STM32CubeIDE / CubeMX configuration (.ioc):
+ *   PA0 đã được CubeMX tự động tạo trong MX_GPIO_Init() (Freertos.ioc).
+ *   Không cần chỉnh tay. Cài đặt gốc trong .ioc:
+ *
+ *     Pinout & Configuration → PA0
+ *       GPIO mode   : External Interrupt Mode with Rising edge trigger
+ *       GPIO Pull   : No pull-up and no pull-down
+ *                     (board có pull-down ngoại vi — không cần pull nội)
+ *       User Label  : B1 [Blue PushButton]
+ *
+ *     System Core → NVIC:
+ *       EXTI line0 interrupt : Enabled
+ *       Preemption Priority  : 0  (chú ý: BSP_Button_Init() ghi đè thành 5
+ *                                   bên dưới để an toàn với FreeRTOS API)
+ *
+ * Sau khi gọ mã: BSP_Button_Init() tái cấu hình lại PA0 sang
+ * RISING_FALLING (hai cạnh) để đo được thời gian nhấn.
  * -------------------------------------------------------------------------- */
 
 void BSP_Button_Init(BSP_Button_EventCb_t callback)
@@ -82,7 +104,7 @@ void BSP_Button_IRQHandler(void)
                  * Long-press gesture is no longer handled on PA0. */
                 if (s_callback != NULL)
                 {
-                    s_callback(BTN_EVENT_SHORT_PRESS);
+                    s_callback(BTN_EVENT_NAVIGATE);
                 }
             }
             /* else: noise, ignore */
@@ -94,21 +116,33 @@ void BSP_Button_IRQHandler(void)
  * Public API — PE1 Start/Confirm button
  * -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+ * Public API — PE1 Start/Confirm button
+ * --------------------------------------------------------------------------
+ *
+ * STM32CubeIDE / CubeMX configuration (.ioc):
+ *   PE1 được cấu hình trong MX_GPIO_Init() (Freertos.ioc):
+ *     PE1 : GPIO_MODE_IT_FALLING, Pull-up  (START_BTN)
+ *   __HAL_RCC_GPIOE_CLK_ENABLE() và HAL_GPIO_Init() đã được CubeMX tạo.
+ *
+ *   BSP_StartButton_Init() chỉ cần:
+ *     1. Set NVIC priority = 5 (CubeMX mặc định là 0 — không an toàn với FreeRTOS)
+ *     2. Enable EXTI1 IRQ
+ *
+ * Kết nối phần cứng:
+ *   MCU PE1 ─── [Nút Start] ─── GND  (pull-up nội được bật bởi CubeMX)
+ * -------------------------------------------------------------------------- */
+
 void BSP_StartButton_Init(void)
 {
     /*
-     * Configure PE1 as falling-edge EXTI with internal pull-up.
-     * The button connects PE1 to GND — pressing it drives the line LOW.
-     * Only the falling edge (press moment) is detected; release is ignored.
+     * GPIO init for PE1 (EXTI falling edge, pull-up) is handled by
+     * MX_GPIO_Init() (CubeMX generated). No GPIO init needed here.
+     *
+     * CubeMX does NOT enable EXTI1 IRQ in MX_GPIO_Init() — only PA0 (EXTI0)
+     * is in the NVIC section of the .ioc. So we must enable EXTI1 here and
+     * override the priority to 5 (FreeRTOS-safe).
      */
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    __HAL_RCC_GPIOE_CLK_ENABLE();
-    GPIO_InitStruct.Pin  = START_BUTTON_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(START_BUTTON_PORT, &GPIO_InitStruct);
-
-    /* EXTI1 — does not conflict with EXTI0 (PA0). */
     HAL_NVIC_SetPriority(EXTI1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 }
@@ -117,11 +151,11 @@ void BSP_StartButton_IRQHandler(void)
 {
     /*
      * Every falling edge on PE1 is treated as a Start/Confirm action.
-     * Fire BTN_EVENT_LONG_PRESS so UITask sends a command without any
-     * code change — long press was always the "start" gesture.
+     * Fire BTN_EVENT_CONFIRM so UITask sends a command without any
+     * code change.
      */
     if (s_callback != NULL)
     {
-        s_callback(BTN_EVENT_LONG_PRESS);
+        s_callback(BTN_EVENT_CONFIRM);
     }
 }

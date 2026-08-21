@@ -52,17 +52,30 @@ static uint8_t s_prevWaterPin = 1u;
  * Public API
  * -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+ * Public API
+ * --------------------------------------------------------------------------
+ *
+ * STM32CubeIDE / CubeMX configuration (.ioc):
+ *   PD5 và PD6 được cấu hình trong MX_GPIO_Init() (Freertos.ioc):
+ *     PD5 : GPIO Input, Pull-up  (DOOR_BTN)
+ *     PD6 : GPIO Input, Pull-up  (WATER_BTN)
+ *   __HAL_RCC_GPIOE_CLK_ENABLE() và HAL_GPIO_Init() đã được CubeMX tạo
+ *   tự động — BSP_Sensor_Init() không cần khởi tạo GPIO nữa.
+ *
+ * Kết nối phần cứng:
+ *   MCU PD5 ─── [Nút Door]  ─── GND  (pull-up nội được bật bởi CubeMX)
+ *   MCU PD6 ─── [Nút Water] ─── GND  (pull-up nội được bật bởi CubeMX)
+ * -------------------------------------------------------------------------- */
+
 void BSP_Sensor_Init(void)
 {
-    /* Enable GPIOD clock (may already be active for PD12-PD15, idempotent). */
-    __HAL_RCC_GPIOD_CLK_ENABLE();
-
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin   = DOOR_PIN | WATER_PIN;
-    GPIO_InitStruct.Mode  = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull  = GPIO_PULLUP;   /* High when not pressed, Low when pressed */
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+    /*
+     * GPIO init for PD5 and PD6 is handled by MX_GPIO_Init() (CubeMX generated).
+     * No additional hardware configuration needed here.
+     * BSP_Sensor_Init() is kept as a placeholder for future non-GPIO init
+     * (e.g. software state reset, calibration).
+     */
 }
 
 void BSP_Sensor_Poll(void)

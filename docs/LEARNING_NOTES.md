@@ -387,8 +387,8 @@ s_pressTime = HAL_GetTick();
 // Falling edge (thả ra): tính duration
 uint32_t duration = HAL_GetTick() - s_pressTime;
 ButtonEvent_t event = (duration >= BUTTON_LONG_PRESS_MS)
-                    ? BTN_EVENT_LONG_PRESS
-                    : BTN_EVENT_SHORT_PRESS;
+                    ? BTN_EVENT_CONFIRM
+                    : BTN_EVENT_NAVIGATE;
 xQueueSendFromISR(xButtonQueue, &event, &xWoken);
 ```
 

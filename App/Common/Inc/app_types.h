@@ -68,8 +68,8 @@ typedef enum
  * -------------------------------------------------------------------------- */
 typedef enum
 {
-    BTN_EVENT_SHORT_PRESS = 0, /**< Press < BUTTON_LONG_PRESS_MS — move selection. */
-    BTN_EVENT_LONG_PRESS,      /**< Press ≥ BUTTON_LONG_PRESS_MS — confirm/start. */
+    BTN_EVENT_NAVIGATE = 0, /**< PA0 pressed — move selection. */
+    BTN_EVENT_CONFIRM,      /**< PE1 pressed — confirm/start/reset. */
 } ButtonEvent_t;
 
 /* --------------------------------------------------------------------------

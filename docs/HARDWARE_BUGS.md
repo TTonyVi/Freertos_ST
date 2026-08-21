@@ -277,7 +277,7 @@ Có hai vấn đề kết hợp:
 
 ```c
 // UITask trước fix:
-if (event == BTN_EVENT_SHORT_PRESS)
+if (event == BTN_EVENT_NAVIGATE)
 {
     menuIndex = (menuIndex + 1) % MENU_ITEM_COUNT;
     // ← KHÔNG gửi gì cho OLEDTask → OLED không update
@@ -314,7 +314,7 @@ typedef struct {
 
 **`ui_task.c`** — gửi display update ngay khi cursor thay đổi:
 ```c
-if (event == BTN_EVENT_SHORT_PRESS)
+if (event == BTN_EVENT_NAVIGATE)
 {
     menuIndex = (menuIndex + 1) % MENU_ITEM_COUNT;
 
@@ -413,7 +413,7 @@ void BSP_OLED_Init(void)
 | Khái niệm | Giải thích |
 |---|---|
 | Display RAM | OLED controller có RAM nội bộ lưu pixel data. Power-on state = undefined |
-| Defensive init | Luôn clear display sau `Init()` trước khi vẽ nội dung thực |
+| Defensive init | Nhớ clear display sau `Init()` trước khi vẽ nội dung thực |
 | `ssd1306_UpdateScreen()` | Truyền toàn bộ 128×64 = 1024 bytes qua I2C; tốn thời gian nhưng cần thiết |
 
 ---
@@ -442,14 +442,14 @@ uint8_t BSP_Sensor_IsDoorClosed(void)
 ```
 
 Cơ chế đo long-press trong `BSP_Button_IRQHandler()` bắt buộc phải chờ **cạnh
-xuống** (thả tay) mới tính được duration và bắn `BTN_EVENT_LONG_PRESS`. Nghĩa
+xuống** (thả tay) mới tính được duration và bắn `BTN_EVENT_CONFIRM`. Nghĩa
 là hành động thả tay — điều kiện bắt buộc để xác nhận lệnh — đồng thời cũng
 khiến PA0 về LOW, và `SensorTask` (poll mỗi 100ms) đọc đó là "cửa vừa mở":
 
 ```
 User giữ B1 ≥1.5s → thả tay
   → PA0 = LOW
-  → BSP_Button_IRQHandler(): duration ≥ 1500ms → BTN_EVENT_LONG_PRESS
+  → BSP_Button_IRQHandler(): duration ≥ 1500ms → BTN_EVENT_CONFIRM
       → UITask → CMD_START_WASH → SM: IDLE → FILL_WATER
   → (≤100ms sau) SensorTask: BSP_Sensor_IsDoorClosed() == LOW
       → xEventGroupSetBits(EVT_ERROR)
@@ -499,14 +499,14 @@ dòng status cuối OLED tạm thời nhảy về `IDLE` sai lệch, dù máy v�
 ### Root Cause
 
 `UITask` không biết `WashingManager` đang ở state nào — nó xử lý mọi
-`BTN_EVENT_SHORT_PRESS` như đang ở màn hình chờ, và tự gửi một `DisplayMsg_t`
+`BTN_EVENT_NAVIGATE` như đang ở màn hình chờ, và tự gửi một `DisplayMsg_t`
 đè lên màn hình dùng `s_statusCache`:
 
 ```c
 // ui_task.c
 static char s_statusCache[24] = "IDLE";   // chỉ khởi tạo 1 lần, không nơi nào update lại
 
-if (event == BTN_EVENT_SHORT_PRESS)
+if (event == BTN_EVENT_NAVIGATE)
 {
     ...
     strncpy(disp.statusText, s_statusCache, sizeof(disp.statusText) - 1u);
@@ -548,7 +548,7 @@ luôn build `CMD_START_WASH` hoặc `CMD_START_SPIN` tùy `menuIndex`
 ([ui_task.c:73-90](../App/UITask/Src/ui_task.c#L73-L90)):
 
 ```c
-else if (event == BTN_EVENT_LONG_PRESS)
+else if (event == BTN_EVENT_CONFIRM)
 {
     CommandMsg_t cmd;
     cmd.menuIndex = menuIndex;
