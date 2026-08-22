@@ -69,7 +69,7 @@ typedef enum
 typedef enum
 {
     BTN_EVENT_NAVIGATE = 0, /**< PA0 pressed — move selection. */
-    BTN_EVENT_CONFIRM,      /**< PE1 pressed — confirm/start/reset. */
+    BTN_EVENT_CONFIRM,      /**< PD2 pressed — confirm/start/reset. */
 } ButtonEvent_t;
 
 /* --------------------------------------------------------------------------
@@ -78,16 +78,20 @@ typedef enum
  * High-level intent sent from UITask to WashingManager via Command Queue.
  * UITask maps (ButtonEvent_t + menu state) → Command_t.
  *
- *   Short press on menu   →  UITask moves cursor (no command sent)
- *   Long press on "Wash"  →  CMD_START_WASH
- *   Long press on "Spin"  →  CMD_START_SPIN
- *   Any state + error     →  CMD_RESET
+ *   BTN_EVENT_NAVIGATE (PA0)          →  UITask moves cursor (no command sent)
+ *   BTN_EVENT_CONFIRM (PD2), cursor=Wash →  CMD_START_WASH
+ *   BTN_EVENT_CONFIRM (PD2), cursor=Spin →  CMD_START_SPIN
+ *
+ * CMD_RESET is never built by UITask — WashingManager reinterprets any
+ * incoming CMD_START_WASH/CMD_START_SPIN as a reset while in FINISH or
+ * ERROR state instead (see Manager_HandleCommand() in washing_manager.c).
+ * The enum value is kept for a future producer that might send it directly.
  * -------------------------------------------------------------------------- */
 typedef enum
 {
     CMD_START_WASH = 0, /**< Start the full wash cycle. */
     CMD_START_SPIN,     /**< Start the spin-only cycle. */
-    CMD_RESET,          /**< Clear ERROR state; return to IDLE. */
+    CMD_RESET,          /**< Reserved: no current producer sends this (see above). */
 } Command_t;
 
 #endif /* APP_COMMON_APP_TYPES_H */

@@ -275,19 +275,19 @@ eliminating the need for a debugger connection during testing.
 | Pin | Role | Interface | Behavior |
 |-----|------|-----------|----------|
 | PA0 | Navigate menu | EXTI0, both edges, pull-down | Short press → next menu item |
-| PE1 | Start / Confirm | EXTI1, falling edge, pull-up | Any press → start selected mode |
+| PD4 | Start / Confirm | EXTI4, falling edge, pull-up | Any press → start selected mode |
 | PD5 | Door sensor sim | GPIO Input, pull-up, polling 100 ms | Toggle press → open/close door |
 | PD6 | Water sensor sim | GPIO Input, pull-up, polling 100 ms | Toggle press → full/empty water |
 
-**Why EXTI for PE1, polling for PD5/PD6?**
-PE1 uses EXTI1 — no conflict with EXTI0 (PA0). Using EXTI gives immediate,
+**Why EXTI for PD4, polling for PD5/PD6?**
+PD4 uses EXTI4 — no conflict with EXTI0 (PA0). Using EXTI gives immediate,
 ISR-driven response for the Start button. PD5/PD6 are toggle switches polled
 every 100 ms by SensorTask — latency is acceptable and avoids adding two
 more ISR handlers.
 
-**Why PE1 for Start instead of a second gesture on PA0?**
-Separating UI input (PA0) from confirmation (PE1) eliminates long-press
-timing complexity and makes the gesture model unambiguous. Any press on PE1
+**Why PD4 for Start instead of a second gesture on PA0?**
+Separating UI input (PA0) from confirmation (PD4) eliminates long-press
+timing complexity and makes the gesture model unambiguous. Any press on PD4
 immediately fires `BTN_EVENT_LONG_PRESS`, which UITask already handles
 to send the start command — no UITask code change required.
 
@@ -349,8 +349,111 @@ After a full Wash cycle reaches `FINISH`, the machine stops responding to button
   - Renamed `BTN_EVENT_LONG_PRESS` to `BTN_EVENT_CONFIRM`.
   - Updated all C source files, header files, and markdown/HTML documentation to use the new names.
 - **Why it changed:**
-  - When buttons were decoupled (TD-12), the long-press duration calculation on PA0 was removed. PE1 became a dedicated Start/Confirm button.
-  - Keeping "SHORT_PRESS" and "LONG_PRESS" in code was misleading, as PE1 detects simple falling edges immediately (not long presses), and PA0 only navigates.
+  - When buttons were decoupled (TD-12), the long-press duration calculation on PA0 was removed. PD4 became a dedicated Start/Confirm button.
+  - Keeping "SHORT_PRESS" and "LONG_PRESS" in code was misleading, as PD4 detects simple falling edges immediately (not long presses), and PA0 only navigates.
 - **What I should learn from it:**
   - Code names should strictly reflect physical behavior and domain model realities to prevent cognitive load and technical debt.
   - Maintain documentation consistency across all formats (Markdown, HTML, learning logs) when performing codebase-wide refactoring.
+
+### Change Record — Code Review Fixes + Move Start/Confirm Button PE1 → PD4 (2026-08-22)
+
+- **Goal:** Fix bugs found during a full source review, remove dead code, and
+  resolve a real hardware conflict discovered while wiring the Start/Confirm
+  button on actual hardware.
+- **Files changed:**
+  - [`stm32f4xx_it.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/Core/Src/stm32f4xx_it.c)
+  - [`stm32f4xx_it.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/Core/Inc/stm32f4xx_it.h)
+  - [`main.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/Core/Src/main.c)
+  - [`Freertos.ioc`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/Freertos.ioc)
+  - [`bsp_button.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/BSP/Inc/bsp_button.h)
+  - [`bsp_button.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/BSP/Src/bsp_button.c)
+  - [`bsp_sensor.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/BSP/Src/bsp_sensor.c)
+  - [`washing_manager.c`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/WashingManager/Src/washing_manager.c)
+  - [`washing_sm.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/WashingManager/Inc/washing_sm.h)
+  - [`app_msg.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/Common/Inc/app_msg.h)
+  - [`app_types.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/Common/Inc/app_types.h)
+  - `docs/GPIO_CONFIG.md`, `docs/HARDWARE_BUGS.md`, `docs/SYSTEM_DIAGRAMS.md`,
+    `docs/SYSTEM_DIAGRAMS.html`, `PROJECT_SPEC.md`
+- **What changed:**
+  - Removed the dead `case CMD_RESET:` branch in `Manager_HandleCommand()` —
+    no producer ever builds `CMD_RESET`; the FINISH/ERROR check above it
+    already handles the reset path (Bug #10 fix). Updated doc comments in
+    `washing_sm.h`, `app_msg.h`, `app_types.h` to match.
+  - Fixed 5 factual errors in `SYSTEM_DIAGRAMS.md`/`.html` found during a
+    flow-vs-code review: `xEventGroupSetBitsFromISR` → `xEventGroupSetBits`
+    for the Timer Service Task callback (not real ISR context), a stale node
+    name, a missing UITask→display-queue edge, an inaccurate error-scenario
+    sequence diagram, and a debug tip referencing deleted functions.
+  - Diagnosed a real hardware bug on actual board bring-up: PE1 (originally
+    chosen for Start/Confirm) is tied on-board to the LIS3DSH accelerometer's
+    `MEMS_INT2` output — confirmed via schematic and via logic-analyzer
+    measurement staying LOW regardless of internal pull direction. Moved the
+    Start/Confirm button to **PD4** across `.ioc`, `main.c`, `stm32f4xx_it.c`/`.h`,
+    BSP comments, and all docs (Bug #14).
+  - While regenerating code for the PD4 change, CubeMX reset PA0's edge
+    trigger and both EXTI0/EXTI4 NVIC priorities back to defaults, and the
+    new `EXTI4_IRQHandler()` was missing the `BSP_StartButton_IRQHandler()`
+    call — a regression of Bug #12/#13/#11 that had already been fixed once
+    before. Re-applied all three fixes and documented the regression as
+    Bug #15.
+- **Why it changed:**
+  - Dead code and stale comments left the state-machine documentation
+    inconsistent with actual runtime behavior — a review turned these up
+    before they caused confusion during debugging.
+  - PE1 is not a free GPIO on this board; wiring a button there can never
+    work correctly no matter how the firmware is configured, because the
+    on-board accelerometer's interrupt output physically fights the pin.
+  - `.ioc` had silently drifted from the previously-fixed state between
+    sessions; any subsequent "Generate Code" reverts main.c to whatever the
+    (stale) `.ioc` says, regardless of which pin was actually being edited.
+- **What I should learn from it:**
+  - "Generate Code" rewrites the *entire* `MX_GPIO_Init()`, not just the pin
+    you touched in the GUI — always re-verify unrelated pins after every
+    regenerate, not just the one you meant to change.
+  - Renaming an EXTI line (changing pins) renames its `USER CODE` block too;
+    CubeMX does not carry old block content into the new block name — any
+    manual code inside must be re-added by hand every time.
+  - When a board is a "Discovery kit", assume nothing on the header is a
+    free GPIO until checked against the schematic — evaluation boards
+    routinely multiplex pins with on-board sensors/audio/USB.
+  - A logic-analyzer reading that stays constant regardless of internal
+    pull-up/pull-down direction is a strong, fast diagnostic for "something
+    external is driving this pin" — worth checking before assuming a wiring
+    fault.
+
+### Change Record — Move Start/Confirm Button PD4 → PD2 (2026-08-22, same session)
+
+- **Goal:** PD4 also measured stuck LOW on real hardware; move the
+  Start/Confirm button to a third pin at the user's request, without running
+  the isolation test that was recommended first.
+- **Files changed:** same set as the PE1 → PD4 change above
+  (`Freertos.ioc`, `main.c`, `stm32f4xx_it.c`/`.h`, `bsp_button.h`/`.c`,
+  `app_types.h`, `app_msg.h`, `docs/GPIO_CONFIG.md`, `docs/HARDWARE_BUGS.md`,
+  `docs/SYSTEM_DIAGRAMS.md`/`.html`, `PROJECT_SPEC.md`, `CLAUDE.md`).
+- **What changed:**
+  - Renamed PD4 → PD2 across the same chain (EXTI4 → EXTI2,
+    `GPIO_PIN_4` → `GPIO_PIN_2`) everywhere the previous change touched.
+  - Documented the PD4 failure as **Bug #16** with root cause explicitly
+    marked *unconfirmed* — the PD4-is-safe reasoning in Bug #14 was based on
+    the STM32F4-Discovery (407) schematic, not the actual 411E (MB1115) one;
+    automated schematic fetches for the correct board timed out twice.
+  - While generating code for PD2 in the CubeMX GUI, the exact same
+    regression as Bug #15 happened a third time (PA0 lost its FALLING edge
+    and both EXTI0/EXTI2 dropped to NVIC priority 0) — fixed again the same
+    way, re-synced `.ioc` and `main.c`.
+- **Why it changed:** user's explicit choice to prioritize moving forward
+  over diagnosing PD4, given time constraints.
+- **What I should learn from it:**
+  - Two different pins reading the exact same "stuck LOW" symptom is a
+    stronger signal that something *constant* across both attempts (wiring,
+    the button itself, or the measurement setup) is the real cause, not
+    two independent pin conflicts — flagged this to the user but respected
+    their decision to move on without confirming.
+  - A conclusion inferred from a similar-but-different board revision must
+    be labeled as an unconfirmed hypothesis, not stated as fact — this
+    would have prevented presenting the PD4 recommendation with more
+    confidence than the evidence supported.
+  - The Bug #15-style regression is now a proven repeat pattern (3 times in
+    a row) tied specifically to using the CubeMX GUI to change a pin —
+    every future pin change on this project should budget for re-checking
+    PA0 and NVIC priorities immediately after, not as an afterthought.

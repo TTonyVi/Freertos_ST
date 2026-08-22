@@ -64,7 +64,10 @@ Debug Tools:
 Inputs:
 
 * B1 User Button (PA0) — Short press: navigate menu
-* Start/Confirm Button (PE1, external) — Press: confirm selection / start cycle
+* Start/Confirm Button (PD2, external) — Press: confirm selection / start cycle
+  (3rd pin tried: moved off PE1 — tied on-board to the LIS3DSH accelerometer's
+  MEMS_INT2 output — then off PD4, which also read stuck LOW for an
+  unconfirmed reason; see docs/HARDWARE_BUGS.md Bug #14 / #16)
 * Door Sensor Button (PD5, external) — Toggle: simulate door open/close
 * Water Level Button (PD6, external) — Toggle: simulate water full/empty
 

@@ -68,19 +68,19 @@ Short Press:
 
 * Move selection between menu items
 
-Note: Long press removed. Confirm/Start is handled by PE1.
+Note: Long press removed. Confirm/Start is handled by PD2.
 
 ---
 
-### Start / Confirm Button — (PE1, external)
+### Start / Confirm Button — (PD2, external)
 
 GPIO:
 
-PE1
+PD2
 
 Interface:
 
-EXTI1, falling edge, internal pull-up (button connects PE1 to GND)
+EXTI2, falling edge, internal pull-up (button connects PD2 to GND)
 
 Function:
 
@@ -285,7 +285,7 @@ Wash
 
 > Spin
 
-PE1 Press (Start/Confirm):
+PD2 Press (Start/Confirm):
 
 * Start selected mode immediately (no hold required)
 

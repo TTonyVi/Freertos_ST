@@ -37,7 +37,10 @@
  *
  *   CommandMsg_t  CMD_START_WASH  → WASH_EVT_START_WASH
  *   CommandMsg_t  CMD_START_SPIN  → WASH_EVT_START_SPIN
- *   CommandMsg_t  CMD_RESET       → WASH_EVT_RESET
+ *   Any CommandMsg_t, while in FINISH or ERROR → WASH_EVT_RESET
+ *       (checked before the command is even decoded — see
+ *       Manager_HandleCommand() in washing_manager.c. No producer ever
+ *       builds CMD_RESET; UITask only sends CMD_START_WASH/CMD_START_SPIN.)
  *   EVT_WATER_FULL (event group)  → WASH_EVT_WATER_FULL
  *   EVT_TIMEOUT   (event group)   → WASH_EVT_TIMEOUT or WASH_EVT_WASH_DONE
  *                                   depending on current state

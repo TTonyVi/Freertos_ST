@@ -24,11 +24,16 @@
  * Sent by UITask to WashingManager via the Command Queue.
  *
  * UITask builds this after interpreting a ButtonEvent_t against the
- * current menu cursor position:
+ * current menu cursor position (BTN_EVENT_CONFIRM on PD2 — any press,
+ * no long-press gesture anymore):
  *
- *   cursor on "Wash" + long press  →  { CMD_START_WASH, WASH_MODE_WASH }
- *   cursor on "Spin" + long press  →  { CMD_START_SPIN, WASH_MODE_SPIN }
- *   error screen   + long press  →  { CMD_RESET,      (ignored)       }
+ *   cursor on "Wash" + PD2 press  →  { CMD_START_WASH, WASH_MODE_WASH }
+ *   cursor on "Spin" + PD2 press  →  { CMD_START_SPIN, WASH_MODE_SPIN }
+ *
+ * UITask never builds CMD_RESET — while WashingManager is in FINISH or
+ * ERROR, it reinterprets whichever of the two commands above arrives as
+ * a reset back to IDLE instead of decoding it normally. See
+ * Manager_HandleCommand() in washing_manager.c.
  *
  * WashingManager reads this with xQueueReceive() and drives the state
  * machine accordingly.

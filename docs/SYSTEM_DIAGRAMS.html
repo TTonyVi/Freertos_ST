@@ -139,7 +139,7 @@
 flowchart TD
     %% --- Hardware layer ---
     HW_BTN["B1 Button (PA0)\nShort press: navigate"]
-    HW_PE1["Start Button (PE1)\nPress: confirm/start"]
+    HW_PD2["Start Button (PD2)\nPress: confirm/start"]
     HW_PD5["Door Btn (PD5)\nToggle door"]
     HW_PD6["Water Btn (PD6)\nToggle water"]
     HW_OLED["OLED SSD1306 (I2C)"]
@@ -150,8 +150,8 @@ flowchart TD
 
     %% --- ISR layer ---
     ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce &rarr; NAVIGATE only\n[ISR CONTEXT]"]
-    ISR_PE1["EXTI1_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge &rarr; CONFIRM\n[ISR CONTEXT]"]
-    ISR_TMR["Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]"]
+    ISR_PD2["EXTI2_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge &rarr; CONFIRM\n[ISR CONTEXT]"]
+    TMR_CB["Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]"]
 
     %% --- Queue / Event objects ---
     Q_BTN[("xButtonQueue\n─────────────\nItem: ButtonEvent_t\nDepth: 5\nISR &rarr; UITask")]
@@ -174,10 +174,11 @@ flowchart TD
     %% --- Connections ---
     HW_BTN --&gt;|"RISING/FALLING edge"| ISR_BTN
     ISR_BTN --&gt;|"xQueueSendFromISR\nBTN_EVENT_NAVIGATE"| Q_BTN
-    HW_PE1 --&gt;|"FALLING edge EXTI1"| ISR_PE1
-    ISR_PE1 --&gt;|"xQueueSendFromISR\nBTN_EVENT_CONFIRM"| Q_BTN
+    HW_PD2 --&gt;|"FALLING edge EXTI2"| ISR_PD2
+    ISR_PD2 --&gt;|"xQueueSendFromISR\nBTN_EVENT_CONFIRM"| Q_BTN
     Q_BTN --&gt;|"xQueueReceive\nblocks"| UI
     UI --&gt;|"xQueueSend"| Q_CMD
+    UI --&gt;|"xQueueSend\n(cursor move — BTN_EVENT_NAVIGATE)"| Q_DSP
 
     Q_CMD --&gt;|"xQueueReceive\nblocks (IDLE state)"| WASH
     WASH --&gt;|"xQueueSend"| Q_DSP
@@ -191,8 +192,8 @@ flowchart TD
     EG --&gt;|"xEventGroupWaitBits\nblocks mid-cycle"| WASH
 
     WASH --&gt;|"xTimerStart\n(entry action)"| T1 &amp; T2 &amp; T3 &amp; T4
-    T1 &amp; T2 &amp; T3 &amp; T4 --&gt;|"fires callback"| ISR_TMR
-    ISR_TMR --&gt;|"xEventGroupSetBitsFromISR\nEVT_TIMEOUT"| EG
+    T1 &amp; T2 &amp; T3 &amp; T4 --&gt;|"fires callback"| TMR_CB
+    TMR_CB --&gt;|"xEventGroupSetBits\nEVT_TIMEOUT\n(Timer Svc Task, KHÔNG phải ISR)"| EG
     WASH --&gt;|"xEventGroupSetBits\nEVT_FINISHED / EVT_ERROR"| EG
 
     WASH --&gt;|"BSP calls"| HW_MOTOR &amp; HW_INLET &amp; HW_DRAIN &amp; HW_LED
@@ -256,14 +257,14 @@ stateDiagram-v2
 
 <h2 id="sec3">3. Kịch bản A — Full Wash Cycle (Bình thường)</h2>
 
-<p><strong>Trigger:</strong> User nhấn PE1 (Start button) khi cursor ở "Wash"</p>
+<p><strong>Trigger:</strong> User nhấn PD2 (Start button) khi cursor ở "Wash"</p>
 
 <div class="diagram">
 <pre class="mermaid">
 sequenceDiagram
     actor User
     participant ISR0 as EXTI0 ISR (PA0)
-    participant ISR1 as EXTI1 ISR (PE1)
+    participant ISR1 as EXTI2 ISR (PD2)
     participant UI   as UITask
     participant WASH as WashingManager
     participant SENS as SensorTask
@@ -287,8 +288,8 @@ sequenceDiagram
     UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=0 "IDLE")
     OLED-&gt;&gt;OLED: Render: cursor trở về "Wash"
 
-    Note over User,OLED: ── User xác nhận (nhấn PE1) ──
-    User-&gt;&gt;ISR1: Nhấn PE1 (Start button)
+    Note over User,OLED: ── User xác nhận (nhấn PD2) ──
+    User-&gt;&gt;ISR1: Nhấn PD2 (Start button)
     ISR1-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_CONFIRM)
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH, WASH_MODE_WASH, menuIndex=0)
 
@@ -321,7 +322,7 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_TIMEOUT|EVT_ERROR)
     Note right of WASH: BLOCKED — waiting 20 s
 
-    TMR--&gt;&gt;WASH: xWashTimer fires → xEventGroupSetBitsFromISR(EVT_TIMEOUT)
+    TMR--&gt;&gt;WASH: xWashTimer fires → xEventGroupSetBits(EVT_TIMEOUT)<br/>(Timer Service Task context, không phải ISR)
     WASH-&gt;&gt;WASH: Unblocked: EVT_TIMEOUT
     WASH-&gt;&gt;WASH: SM: WASHING → DRAIN
 
@@ -348,8 +349,8 @@ sequenceDiagram
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "FINISHED")
     OLED-&gt;&gt;OLED: Render "FINISHED"
 
-    Note over User,OLED: ── User acknowledge (nhấn PE1) ──
-    User-&gt;&gt;ISR1: Nhấn PE1
+    Note over User,OLED: ── User acknowledge (nhấn PD2) ──
+    User-&gt;&gt;ISR1: Nhấn PD2
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
@@ -360,19 +361,19 @@ sequenceDiagram
 
 <h2 id="sec4">4. Kịch bản B — Spin-Only Cycle</h2>
 
-<p><strong>Trigger:</strong> User nhấn PE1 (Start) khi cursor ở "Spin"</p>
+<p><strong>Trigger:</strong> User nhấn PD2 (Start) khi cursor ở "Spin"</p>
 
 <div class="diagram">
 <pre class="mermaid">
 sequenceDiagram
     actor User
-    participant ISR1 as EXTI1 ISR (PE1)
+    participant ISR1 as EXTI2 ISR (PD2)
     participant UI   as UITask
     participant WASH as WashingManager
     participant TMR  as Timer Callback
     participant OLED as OLEDTask
 
-    User-&gt;&gt;ISR1: Nhấn PE1 (cursor = Spin)
+    User-&gt;&gt;ISR1: Nhấn PD2 (cursor = Spin)
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_SPIN, WASH_MODE_SPIN, menuIndex=1)
 
@@ -392,7 +393,7 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: xEventGroupSetBits(EVT_FINISHED)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "FINISHED")
 
-    User-&gt;&gt;ISR1: Nhấn PE1
+    User-&gt;&gt;ISR1: Nhấn PD2
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
@@ -412,6 +413,7 @@ sequenceDiagram
     participant EG   as xSystemEvents
     participant WASH as WashingManager
     participant OLED as OLEDTask
+    participant UI   as UITask
 
     Note over WASH: Đang ở bất kỳ state nào đang chạy
     Note over WASH: (FILL_WATER / WASHING / DRAIN / SPIN)
@@ -437,12 +439,15 @@ sequenceDiagram
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "ERROR")
     OLED-&gt;&gt;OLED: Render "ERROR"
 
-    Note over WASH: SM blocks on xCommandQueue — chờ CMD_RESET
+    Note over WASH: SM blocks on xCommandQueue — chờ lệnh bất kỳ từ UITask
     WASH-&gt;&gt;WASH: xQueueReceive(xCommandQueue, portMAX_DELAY)
 
-    Note over SENS: User đóng cửa lại (nhấn PD5) + nhấn PE1 để reset
+    Note over SENS: User đóng cửa lại (nhấn PD5) + nhấn PD2 để reset
     actor User
-    User-&gt;&gt;WASH: PE1 → BTN_EVENT_CONFIRM → CMD_RESET
+    User-&gt;&gt;UI: Nhấn PD2 → BTN_EVENT_CONFIRM
+    UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN, menuIndex)
+    Note right of WASH: UITask KHÔNG có khái niệm CMD_RESET —<br/>luôn gửi START_WASH/START_SPIN theo menuIndex
+    WASH-&gt;&gt;WASH: Check state (ERROR) → map bất kỳ command nào thành WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: ERROR → IDLE
     WASH-&gt;&gt;EG: xEventGroupClearBits(EVT_FINISHED | EVT_ERROR)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "IDLE")
@@ -490,7 +495,7 @@ flowchart TD
 <pre class="mermaid">
 flowchart TD
     PA0(["PA0 — B1 Button\nNavigate menu"])
-    PE1(["PE1 — Start Button\nConfirm / Start"])
+    PD2(["PD2 — Start Button\nConfirm / Start"])
 
     PA0 --&gt;|"RISING edge &rarr; record time\nFALLING edge &rarr; measure duration"| ISR0
 
@@ -500,9 +505,9 @@ flowchart TD
     DEB --&gt;|YES| NOISE["Noise — ignore"]
     DEB --&gt;|NO = Navigate| S_SEND["xQueueSendFromISR\n(BTN_EVENT_NAVIGATE)\n+ portYIELD_FROM_ISR"]
 
-    PE1 --&gt;|"FALLING edge (press)"| ISR1
+    PD2 --&gt;|"FALLING edge (press)"| ISR1
 
-    ISR1["EXTI1_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press"]
+    ISR1["EXTI2_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press"]
 
     ISR1 --&gt; L_SEND["xQueueSendFromISR\n(BTN_EVENT_CONFIRM)\n+ portYIELD_FROM_ISR"]
 
@@ -560,7 +565,7 @@ flowchart LR
 
     ENA --&gt;|"posts timer command\nto timer queue"| COUNT
     COUNT --&gt;|"calls callback"| CB
-    CB --&gt;|"xEventGroupSetBitsFromISR\n(safe from Timer Svc context)"| BIT
+    CB --&gt;|"xEventGroupSetBits (plain, KHÔNG phải FromISR)\nTimer Svc Task là task thật, không phải ISR"| BIT
     BIT --&gt;|"unblocks WashingManager\nif waiting on EVT_TIMEOUT"| WAIT_T
     WAIT_T --&gt; PROC
     PROC --&gt;|"onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)"| ENA
@@ -579,7 +584,7 @@ flowchart LR
 <pre class="mermaid">
 flowchart TD
     subgraph "Trong mỗi phase, WashingManager block tại:"
-        IDLE_B["STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PE1 (Start/Confirm)"]
+        IDLE_B["STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PD2 (Start/Confirm)"]
 
         FILL_B["STATE: FILL_WATER\n──────────────────────\nxEventGroupWaitBits\n(EVT_WATER_FULL OR EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ sensor OR timer 10s OR cửa mở"]
 
@@ -602,7 +607,7 @@ flowchart TD
 
 <p><strong>Debug tip:</strong> Nếu màn hình không update → OLEDTask đang chờ message ở xDisplayQueue. Kiểm tra WashingManager có gọi <code>Manager_PostDisplay()</code> không.</p>
 
-<p><strong>Debug tip:</strong> Nếu machine không start khi nhấn PE1 → kiểm tra EXTI1 đã được enable chưa? <code>BSP_StartButton_Init()</code> được gọi sau <code>BSP_Button_Init()</code> trong UITask.</p>
+<p><strong>Debug tip:</strong> Nếu machine không start khi nhấn PD2 → kiểm tra theo thứ tự: (1) <code>Freertos.ioc</code>/<code>main.c</code> — <code>MX_GPIO_Init()</code> có <code>HAL_NVIC_EnableIRQ(EXTI2_IRQn)</code> với priority 5 không; (2) <code>EXTI2_IRQHandler()</code> trong <code>stm32f4xx_it.c</code> có thực sự gọi <code>BSP_StartButton_IRQHandler()</code> trong <code>USER CODE BEGIN EXTI2_IRQn 0</code> không (từng bị thiếu dòng này — xem HARDWARE_BUGS.md § Bug #11). GPIO/NVIC của PA0 và PD2 hiện do CubeMX generate hoàn toàn — không còn hàm <code>BSP_Button_Init()</code>/<code>BSP_StartButton_Init()</code> nữa; <code>ui_task.c</code> chỉ gọi <code>BSP_Button_RegisterCallback()</code>.</p>
 
 <hr>
 
@@ -645,7 +650,7 @@ Owner phân quyền:
     </tr>
   </thead>
   <tbody>
-    <tr><td><code>xButtonQueue</code></td><td>Queue</td><td>5 items</td><td>ISR EXTI0 (PA0) + ISR EXTI1 (PE1)</td><td>UITask</td><td><code>xQueueSendFromISR</code> / <code>xQueueReceive</code></td></tr>
+    <tr><td><code>xButtonQueue</code></td><td>Queue</td><td>5 items</td><td>ISR EXTI0 (PA0) + ISR EXTI2 (PD2)</td><td>UITask</td><td><code>xQueueSendFromISR</code> / <code>xQueueReceive</code></td></tr>
     <tr><td><code>xCommandQueue</code></td><td>Queue</td><td>5 items</td><td>UITask</td><td>WashingManager</td><td><code>xQueueSend</code> / <code>xQueueReceive</code></td></tr>
     <tr><td><code>xDisplayQueue</code></td><td>Queue</td><td>5 items</td><td>WashingManager, UITask</td><td>OLEDTask</td><td><code>xQueueSend</code> / <code>xQueueReceive</code></td></tr>
     <tr><td><code>xSystemEvents</code></td><td>Event Group</td><td>5 bits</td><td>SensorTask, TimerCb, WashMgr</td><td>WashingManager</td><td><code>xEventGroupSetBits</code> / <code>xEventGroupWaitBits</code></td></tr>

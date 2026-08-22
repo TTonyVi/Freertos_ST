@@ -15,22 +15,28 @@
  *   No duration measurement needed — any press confirms the selection.
  *
  *   Hardware mapping:
- *     Pin   : PE1
- *     EXTI  : EXTI1, falling edge only
- *     Pull  : internal pull-up (active LOW — button connects PE1 to GND)
+ *     Pin   : PD2 — third pin tried for this button. Moved off PE1 first
+ *             (HARDWARE_BUGS.md Bug #14: PE1 is tied on-board to the
+ *             LIS3DSH accelerometer's MEMS_INT2 output), then off PD4
+ *             (Bug #16: also measured stuck LOW on this board; root cause
+ *             not confirmed — moved on without full diagnosis at the
+ *             user's request). If PD2 also misbehaves, do NOT guess a
+ *             fourth pin — get the actual MB1115 schematic confirmed first.
+ *     EXTI  : EXTI2, falling edge only
+ *     Pull  : internal pull-up (active LOW — button connects PD2 to GND)
  *
  * Both ISRs route to the same xButtonQueue via the same registered callback,
  * so UITask requires no changes: NAVIGATE = navigate, CONFIRM = start.
  *
  * Priority note:
- *   Both EXTI0 and EXTI1 are set to preempt priority 5 so that
+ *   Both EXTI0 and EXTI2 are set to preempt priority 5 so that
  *   xQueueSendFromISR() is safe to call from the callback.
  */
 
 #ifndef APP_BSP_BSP_BUTTON_H
 #define APP_BSP_BSP_BUTTON_H
 
-#include "app_types.h"  /* ButtonEvent_t */
+#include "app_types.h" /* ButtonEvent_t */
 
 /**
  * @brief  Callback type invoked from ISR context when a gesture is detected.
@@ -39,45 +45,20 @@
 typedef void (*BSP_Button_EventCb_t)(ButtonEvent_t event);
 
 /**
- * @brief  Configure PA0 for short-press detection and register the callback.
+ * @brief  Register the event callback used by both button ISRs.
  *
- * Reconfigures PA0 from rising-only (CubeMX default) to rising + falling
- * so that release can be detected. Only SHORT_PRESS is generated.
- * Sets EXTI0 preempt priority to 5 (FreeRTOS-safe).
+ * All GPIO and NVIC configuration is done by CubeMX (MX_GPIO_Init).
+ * This is the only BSP init needed — call from UITask before its loop.
  *
- * @param  callback  Function called on short press. May be NULL.
+ * @param  callback  Called from ISR on BTN_EVENT_NAVIGATE (PA0) or
+ *                   BTN_EVENT_CONFIRM (PD2). May be NULL to disable.
  */
-void BSP_Button_Init(BSP_Button_EventCb_t callback);
+void BSP_Button_RegisterCallback(BSP_Button_EventCb_t callback);
 
-/**
- * @brief  Process one EXTI0 edge event (PA0 — Menu Navigate).
- *
- * Must be called at the start of EXTI0_IRQHandler().
- *
- * Behaviour:
- *   Rising edge  (PA0 HIGH) → records press start timestamp.
- *   Falling edge (PA0 LOW)  → if duration >= BUTTON_DEBOUNCE_MS
- *                              → callback(BTN_EVENT_NAVIGATE)
- */
+/** @brief Call from EXTI0_IRQHandler. Debounces PA0 → BTN_EVENT_NAVIGATE. */
 void BSP_Button_IRQHandler(void);
 
-/**
- * @brief  Configure PE1 for Start/Confirm press detection.
- *
- * Configures PE1 as falling-edge EXTI with internal pull-up.
- * Reuses the same callback registered in BSP_Button_Init().
- * Sets EXTI1 preempt priority to 5 (FreeRTOS-safe).
- *
- * Call after BSP_Button_Init() so the callback is already registered.
- */
-void BSP_StartButton_Init(void);
-
-/**
- * @brief  Process one EXTI1 edge event (PE1 — Start/Confirm).
- *
- * Must be called at the start of EXTI1_IRQHandler().
- * Fires callback(BTN_EVENT_CONFIRM) on every falling edge.
- */
+/** @brief Call from EXTI2_IRQHandler. Fires BTN_EVENT_CONFIRM on any press. */
 void BSP_StartButton_IRQHandler(void);
 
 #endif /* APP_BSP_BSP_BUTTON_H */

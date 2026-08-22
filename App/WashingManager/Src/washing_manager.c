@@ -185,10 +185,13 @@ static void Manager_HandleCommand(const CommandMsg_t *cmd)
             WashingSM_ProcessEvent(WASH_EVT_START_SPIN);
             break;
 
-        case CMD_RESET:
-            WashingSM_ProcessEvent(WASH_EVT_RESET);
-            break;
-
+        /* CMD_RESET has no case here on purpose: no producer ever builds
+         * cmd->command = CMD_RESET (UITask only sends CMD_START_WASH /
+         * CMD_START_SPIN), and the FINISH/ERROR check above already
+         * intercepts every command in those states before this switch is
+         * reached (Bug #10 fix). A CMD_RESET case here would be dead code.
+         * The enum value stays in app_types.h for a future producer to use;
+         * if one is ever added, re-add the case then. */
         default:
             break;
     }

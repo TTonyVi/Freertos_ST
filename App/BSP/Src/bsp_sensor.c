@@ -60,7 +60,7 @@ static uint8_t s_prevWaterPin = 1u;
  *   PD5 và PD6 được cấu hình trong MX_GPIO_Init() (Freertos.ioc):
  *     PD5 : GPIO Input, Pull-up  (DOOR_BTN)
  *     PD6 : GPIO Input, Pull-up  (WATER_BTN)
- *   __HAL_RCC_GPIOE_CLK_ENABLE() và HAL_GPIO_Init() đã được CubeMX tạo
+ *   __HAL_RCC_GPIOD_CLK_ENABLE() và HAL_GPIO_Init() đã được CubeMX tạo
  *   tự động — BSP_Sensor_Init() không cần khởi tạo GPIO nữa.
  *
  * Kết nối phần cứng:
