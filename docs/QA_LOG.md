@@ -95,6 +95,452 @@ trước khi sửa code, theo đúng quy trình review của CLAUDE.md.
 
 ---
 
+## Session 09 — 2026-08-23 — Mentoring: Event Group, Guard Condition, Level vs Edge
+
+**Chủ đề:** Phiên dạy có hệ thống theo yêu cầu "làm chủ project". Đánh giá
+kiến thức hiện tại qua câu hỏi, dạy sâu Event Group (cả kiến thức tổng quát
+ngoài project), phát hiện lỗ hổng thiết kế guard condition.
+
+**Bối cảnh:** Bạn cho biết mới chỉ nắm chắc Task và Queue. Đã thống nhất lộ
+trình 10 module, kết thúc bằng bài kiểm tra tự thiết kế một project mới.
+Bạn cũng yêu cầu: khi dạy khái niệm nào thì phải mở rộng ra kiến thức tổng
+quát của khái niệm đó, không bó hẹp trong cách project này dùng.
+
+---
+
+### Q1: Kể lại từng bước từ lúc nhấn PD2 đến khi motor bật
+
+**Trả lời của bạn:** ISR tạo data queue → đánh thức UITask → UITask gửi lệnh
+qua queue sang Manager → Manager kiểm tra cửa và mức nước, nếu cửa đóng thì
+mở van, đợi đầy thì bật motor, đồng thời gửi data sang OLED.
+
+**Đánh giá:** Phần Task + Queue **đúng** — nắm chắc cơ chế queue vừa truyền
+data vừa đánh thức task Blocked.
+
+Hai chỗ sai:
+
+1. Nhầm tên van: nạp nước dùng `BSP_VALVE_INLET` (PD13), không phải van xả
+   `BSP_VALVE_DRAIN` (PD14) — van xả chỉ dùng ở state `DRAIN`.
+2. **Sai kiến trúc (quan trọng):** hiểu thành "kiểm tra cửa **rồi mới** mở
+   van" (if-else tuần tự). Thực tế `Manager_OnEnterFillWater()` mở van **vô
+   điều kiện**, còn cửa được giám sát **song song** qua `EVT_ERROR` trong
+   `xEventGroupWaitBits`. Đây là mô hình *"cứ hành động, đồng thời canh
+   chừng sự cố"*, khác bản chất với if-else.
+
+---
+
+### Q2: `xEventGroupWaitBits` khác `xQueueReceive` thế nào? Dùng Queue để chờ 3 điều kiện thì bất tiện gì?
+
+**Trả lời của bạn:** Một event thì dùng queue được nhưng tốn tài nguyên hơn;
+nhiều event thì không dùng queue được.
+
+**Đánh giá:** Trực giác đúng hướng, nhưng lý do chưa trúng. Queue **vẫn dùng
+được** cho nhiều loại sự kiện. Khác biệt thật nằm ở bản chất:
+
+- Queue = dòng sự kiện **rời rạc, có thứ tự, đọc 1 lần là mất** (hộp thư).
+- Event Group = **trạng thái true/false hiện tại** của nhiều cờ độc lập
+  (bảng đèn báo trên taplo).
+
+Điểm chốt: SensorTask poll mỗi 100 ms và set lại bit liên tục — với Event
+Group là **idempotent** (`1 OR 1 = 1`, vô hại), với Queue sẽ **chồng item**
+gây tràn hàng đợi.
+
+---
+
+### Q3: Set cùng một bit 2 lần liên tiếp vs `xQueueSend` 2 lần — khác gì?
+
+**Trả lời của bạn:** Event group thì action đã trigger ở lệnh đầu; queue
+depth ≥ 2 thì lưu 2 lần và consumer xử lý cả 2. Event group "có thể gây lỗi
+hoặc không phản ứng với event thứ 2".
+
+**Đánh giá:** Ý chính đúng. Cần làm rõ: **không có lỗi nào cả** — "không
+phản ứng với lần thứ 2" chính là **thiết kế đúng**, không phải tác dụng phụ.
+Event Group chỉ biểu diễn **level** (đang đúng/sai), **không đếm được**
+(không có edge/count). Muốn đếm phải dùng counting semaphore hoặc biến
+counter + critical section.
+
+Bổ sung: Queue giữ đủ 2 item **không tự động an toàn** — ở project này an
+toàn là nhờ state machine bỏ qua im lặng cặp `(state, event)` không khớp,
+tức nhờ thiết kế phòng thủ của FSM chứ không nhờ bản thân Queue.
+
+---
+
+### Q4 (bạn tự đặt): `EVT_TIMEOUT` của state cũ bắn nhầm sang state sau thì có gây lỗi không?
+
+**Đánh giá:** Câu hỏi rất tốt — bạn tự phát hiện một rủi ro thật trong code.
+`EVT_TIMEOUT` là **một bit dùng chung cho cả 4 timer** (TD-10), nhưng ý
+nghĩa phụ thuộc state đang đọc: ở `FILL_WATER` nghĩa là *lỗi hết giờ*, ở
+`WASHING` nghĩa là *giặt xong bình thường*.
+
+Code đã có phòng thủ bằng `xTimerStop()` gọi **trước** khi đổi state. Nhưng
+`xTimerStop()` không tức thời — nó chỉ gửi lệnh vào timer command queue, xử
+lý bất đồng bộ. Vậy vẫn còn khe hở cực hẹp, **giảm thiểu chứ không loại bỏ**.
+
+**Giải pháp bạn tự đề xuất:** tách thành nhiều bit timeout riêng. Đúng
+hướng. Tinh chỉnh: đặt tên theo ngữ nghĩa phase thay vì `TIMEOUT0/1/2`:
+
+```c
+#define EVT_FILL_TIMEOUT   (1 << 5)   // FILL_WATER: lỗi
+#define EVT_WASH_DONE      (1 << 6)   // WASHING: xong bình thường
+#define EVT_DRAIN_DONE     (1 << 7)
+#define EVT_SPIN_DONE      (1 << 8)
+```
+
+Còn một điểm tinh vi: bit "rác" của state cũ vẫn nằm lại (vì `pdTRUE` chỉ
+xóa bit *được chờ và khớp*) → cần `xEventGroupClearBits()` khi vào state
+mới, theo đúng pattern `Manager_OnEnterIdle()` đang làm.
+
+**Trạng thái:** Chưa implement — mới là thiết kế trên giấy.
+
+---
+
+### Q5: Thêm điều kiện "cửa đóng VÀ nắp lọc OK" mới cho khởi động — đặt ở đâu, `xWaitForAllBits` là gì?
+
+**Trả lời của bạn:** `pdTRUE`, đặt trong `case WASH_STATE_FILL_WATER` vì đó
+là case bắt đầu chu trình giặt.
+
+**Đánh giá:** `pdTRUE` (AND) **đúng**. Vị trí **sai**, 3 lý do:
+
+1. **Quá muộn:** khi vào được `case FILL_WATER` thì
+   `Manager_OnEnterFillWater()` đã chạy — van đã mở, nước đang chảy.
+2. **Bỏ sót nhánh SPIN:** `IDLE → SPIN` không đi qua `FILL_WATER`, nên chế
+   độ vắt sẽ **hoàn toàn không bị kiểm tra**. Lỗ hổng an toàn thật.
+   → Nguyên tắc: guard phải đặt ở chỗ **mọi đường đi đều bắt buộc qua**.
+3. **Sai công cụ:** dùng `WaitBits` (blocking) làm guard.
+
+**Khái niệm mới — Guard Condition (kiến thức FSM tổng quát):**
+
+Bảng transition hiện tại chỉ có `(state, event) → next_state`. Dạng đầy đủ
+theo UML statechart có 4 thành phần:
+
+```
+(state, event, [guard]) → next_state / action
+```
+
+Guard sai → transition **không nổ**, state giữ nguyên, event bị từ chối.
+
+**Phân biệt sống còn — `WaitBits` vs `GetBits`:**
+
+| | `xEventGroupWaitBits()` | `xEventGroupGetBits()` |
+| --- | --- | --- |
+| Ý nghĩa | "Tôi **đợi cho tới khi** đúng" | "**Ngay lúc này** đúng hay sai?" |
+| Blocking | Có | Không |
+| Dùng cho | Chờ sự kiện tương lai | **Guard / precondition** |
+
+Nếu block trong Manager: máy không hiển thị được lý do từ chối, user tưởng
+máy hỏng. Nguyên tắc UX embedded: **fail fast with feedback**.
+
+Vị trí đúng là `Manager_HandleCommand()`, dùng `GetBits`:
+
+```c
+const EventBits_t required = EVT_DOOR_CLOSED | EVT_FILTER_OK;
+EventBits_t bits = xEventGroupGetBits(xSystemEvents);
+if ((bits & required) != required) {
+    Manager_PostDisplay(currentState, "CLOSE DOOR");
+    return;                       // từ chối, KHÔNG đổi state
+}
+```
+
+Idiom cần nhớ: `(bits & mask) != 0` là **OR**, `(bits & mask) != mask` là **AND**.
+
+**Ba loại điều kiện — đừng nhầm:**
+
+| Loại | Đúng khi nào | Ví dụ |
+| --- | --- | --- |
+| Precondition (guard) | **Trước khi** bắt đầu | Cửa đóng + nắp lọc OK trước khi chạy |
+| Invariant | **Suốt** thời gian ở state | Cửa luôn đóng khi motor quay |
+| Postcondition | **Sau khi** hoàn thành | Xả hết nước trước khi vắt |
+
+→ Chính chỗ này giải thích hiểu nhầm ở Q1: bạn nghĩ cửa là *precondition
+tuần tự*, thực tế code đang xử lý nó như *invariant*. Hệ thống tốt cần **cả
+hai** — project hiện đang có invariant nhưng **thiếu guard**.
+
+**Level flag vs Edge event:** chỉ **level flag** mới làm guard được.
+`EVT_DOOR_CLOSED` được SensorTask set/clear liên tục theo trạng thái vật lý
+→ là level → hợp lệ. `EVT_FILTER_OK` mới cũng phải thiết kế theo kiểu này.
+
+**Trạng thái:** Guard chưa implement — mới là thiết kế. Chỉ mới sửa 3 lỗi
+tài liệu phát sinh khi rà `app_events.h` (xem dưới).
+
+---
+
+### Phát sinh: 3 lỗi tài liệu trong `app_events.h` (đã sửa)
+
+Phát hiện khi đọc file để kiểm chứng trước lúc dạy:
+
+1. **Comment `EVT_TIMEOUT`** ghi timer callback set bit *"from ISR context
+   via `xEventGroupSetBitsFromISR()`"* — sai. `Timer_PhaseCallback()` chạy
+   trong **Timer Service Task** (task thật, priority `configTIMER_TASK_PRIORITY`)
+   và dùng `xEventGroupSetBits()` bản thường. Cùng loại lỗi đã sửa trong
+   `SYSTEM_DIAGRAMS.md` trước đây nhưng file này còn sót.
+2. **"Usage example"** gợi ý dùng `WaitBits(EVT_DOOR_CLOSED, portMAX_DELAY)`
+   làm guard — chính là thiết kế blocking-guard vừa phân tích là sai. Đã
+   thay bằng ví dụ phân biệt rõ 2 cách đọc (WaitBits vs GetBits). Ví dụ cũ
+   còn ghi sai tên handle (`hSystemEvents` thay vì `xSystemEvents`).
+3. **Comment `EVT_ERROR`** ghi *"clears only on CMD_RESET"* — sai kép:
+   `case CMD_RESET` đã bị xóa khỏi `Manager_HandleCommand()` (dead code), và
+   bit này thực tế được clear ở `Manager_OnEnterIdle()` cùng tự động bởi
+   `WaitBits(..., pdTRUE, ...)`.
+
+**Bài học chung:** comment không được compiler kiểm tra — nó **trôi khỏi
+code** một cách âm thầm. Đã 4 lần trong project này comment mô tả sai hành
+vi thật (Bug #12, và 3 chỗ vừa rồi). Khi đọc code lạ, luôn xác minh comment
+bằng code thật trước khi tin.
+
+---
+
+### Q6: Trace kịch bản "mở cửa bỏ đồ → đóng cửa → bấm Start" — chuyện gì xảy ra?
+
+**Trả lời của bạn:** Manager nhận command wash, nếu không có lỗi gì thì máy
+hoạt động bình thường, nếu có `EVT_ERROR` thì dừng.
+
+**Đánh giá:** Mới mô tả logic chung, chưa trace giá trị bit thật — mà đó
+chính là mấu chốt. Đáp án: máy **KHÔNG** chạy bình thường. Tại bước bấm
+Start, `EVT_ERROR` **vẫn đang bằng 1**: cửa đã đóng lại nhưng cái bit thì
+không tự đóng theo, vì nhánh `if` trong `sensor_task.c` chỉ set
+`EVT_DOOR_CLOSED` mà **không clear `EVT_ERROR`**.
+
+Hệ quả: `xEventGroupWaitBits()` trong `case FILL_WATER` thấy bit đã set sẵn
+→ trả về ngay, không block → `FILL_WATER → ERROR` trong vài chục micro giây.
+
+Đã ghi lại đầy đủ thành **Bug #17** trong `HARDWARE_BUGS.md`, kèm 3 phương
+án fix (A/B/C) và phân tích ownership.
+
+**Khái niệm tổng quát rút ra — Sticky / Stale Level Flag:**
+
+Cờ level chỉ có đường lên mà không có đường xuống sẽ mô tả **quá khứ** thay
+vì hiện tại. Đặc điểm khiến nó khó bắt: không crash, không warning, phụ
+thuộc *lịch sử thao tác*, và triệu chứng xuất hiện ở module cách xa nguyên
+nhân. Nguyên tắc phòng tránh: **cờ level phải được duy trì đối xứng ở mọi
+nhánh của producer**, và **mỗi bit nên có đúng một chủ sở hữu** chịu trách
+nhiệm clear.
+
+**Trạng thái:** Chưa fix — người dùng quyết định ưu tiên học để làm chủ
+project trước, sửa sau. Người dùng cũng cho biết hệ thống hiện còn một số
+lỗi khác chưa liệt kê; sẽ xử lý ở phiên riêng.
+
+---
+
+## Session 10 — 2026-08-23 — Mentoring buổi 2: Tick/SysTick & Context Switch
+
+**Chủ đề:** Nguồn thời gian vật lý của FreeRTOS (SysTick, HSI vs HSE), cơ chế
+đánh thức Timer Service Task, phân tích đầy đủ một chuỗi context switch thật,
+và tách bạch tầng scheduler với tầng logic ứng dụng.
+
+**Kết quả:** Ghi thành **DD-05** trong `LEARNING_NOTES.md` Part II. Không có
+thay đổi code nào trong buổi này.
+
+---
+
+### Q1: Software Timer — ai quản lý nó, nguồn của nó từ đâu (clock nội hay ngoại)?
+
+**Bối cảnh:** DD-04 (buổi 1) mới trả lời tầng **logic** — Timer Service Task
+quản lý danh sách timer. Câu hỏi này chỉ đúng vào lỗ hổng còn lại: tầng **vật
+lý**, cái gì thực sự tạo ra khái niệm "thời gian".
+
+**Trả lời:**
+
+Có **hai tầng quản lý** khác nhau, không được gộp:
+
+| Tầng | Ai quản lý |
+| --- | --- |
+| Thời gian (vật lý) | **SysTick** — bộ đếm 24-bit nằm trong lõi Cortex-M, thuộc chuẩn ARM chứ không phải ngoại vi của ST |
+| Logic | **Timer Service Task** — dựa vào nhịp SysTick để biết timer nào tới hạn |
+
+Chuỗi đầy đủ: `HSI 16 MHz → SystemCoreClock → SysTick (nạp 15999, tràn mỗi
+1 ms) → xPortSysTickHandler() → xTaskIncrementTick() → daemon chuyển Ready →
+Timer_PhaseCallback()`.
+
+**Nguồn clock của project này = NỘI.** Kiểm chứng bằng `SystemClock_Config()`
+trong `main.c`: `OscillatorType = RCC_OSCILLATORTYPE_HSI`, `PLL.PLLState =
+RCC_PLL_NONE`, `SYSCLKSource = RCC_SYSCLKSOURCE_HSI` → HSI (RC nội ~16 MHz),
+không dùng thạch anh ngoài (HSE), không nhân tần bằng PLL.
+
+**Ba bằng chứng source đã trích:**
+
+- `port.c:826-828` — công thức nạp thanh ghi SysTick.
+- `FreeRTOSConfig.h:130` — `#define xPortSysTickHandler SysTick_Handler`
+  (chính là pattern weak-symbol của Bug #4; thiếu dòng này → tick không tăng →
+  treo toàn hệ thống).
+- `timers.c:817` — `vQueueWaitForMessageRestricted(...)`: daemon **không
+  polling**, nó tự tính thời gian ngủ và dùng đúng cơ chế block-with-timeout
+  chung của kernel.
+
+**Kết luận quan trọng nhất:** Timer Service Task **không có phần cứng riêng,
+không có đặc quyền lịch trình nào** — chỉ là một task bình thường biết tự tính
+thời gian ngủ.
+
+---
+
+### Q2: Bài toán context switch — `xWashTimer` hết hạn khi UITask đang chạy
+
+**Đề bài:** `xWashTimer` (20 s) vừa hết hạn. WashingManager (prio 3) Blocked
+trong `WaitBits`. UITask (prio 2) Running. Daemon (prio 2) Blocked. Hỏi thứ tự
+chạy và số lần context switch tới khi `Manager_OnEnterDrain()` thực thi.
+
+**Trả lời của bạn:** UITask dừng để Timer Service Task chạy → callback set
+event → WashingManager chạy → sau khi WashingManager block lại thì các task
+prio 2 chạy tiếp. **2 lần context switch.**
+
+**Đánh giá:** Chuỗi logic **đúng**. Con số **thiếu** — thực tế tối thiểu **4**.
+
+**Hai điểm bổ sung:**
+
+**(a) UITask nhường CPU KHÔNG phải vì daemon ưu tiên cao hơn.** Daemon = prio
+2, bằng UITask. `tasks.c:4787` yêu cầu `pxTCB->uxPriority > pxCurrentTCB->
+uxPriority` → `2 > 2` là FALSE, nhánh này không kích hoạt. Cái làm nó switch là
+khối **time-slicing** ở `tasks.c:4810-4813` (`configUSE_TIME_SLICING` mặc định
+`1`). → Nếu ai tắt time slicing, daemon sẽ nằm Ready chờ tới khi UITask tự
+block, callback trễ tuỳ ý. Muốn tất định phải đặt `configTIMER_TASK_PRIORITY`
+cao hơn mọi task dùng timer.
+
+**(b) Daemon bị cướp CPU GIỮA CHỪNG callback** — đây là chỗ bị bỏ sót.
+`xEventGroupSetBits()` bọc trong `vTaskSuspendAll()`/`xTaskResumeAll()`
+(`event_groups.c:567,639`). WashingManager được gỡ block bên trong vùng suspend
+nên chỉ đặt cờ `xYieldPendings[0] = pdTRUE` (`tasks.c:4632-4636`), rồi
+`xTaskResumeAll()` thực hiện yield → switch xảy ra **trước khi
+`Timer_PhaseCallback()` kịp return**. Daemon vì thế **bắt buộc phải được chạy
+lại sau** để hoàn tất callback và dọn dẹp.
+
+| # | Từ → Đến | Nguyên nhân |
+| --- | --- | --- |
+| 1 | UITask → daemon | tick + time-slicing (2 == 2) |
+| 2 | daemon → WashingManager | `xTaskResumeAll()` giữa callback |
+| 3 | WashingManager → task prio 2 | `WaitBits` block lại |
+| 4 | … → daemon | round-robin |
+
+Thứ tự giữa UITask và daemon ở bước 3 phụ thuộc con trỏ `pxIndex` của
+ready-list (`tasks.c:189-191`) → **không tất định theo góc nhìn thiết kế, đừng
+bao giờ phụ thuộc vào nó**.
+
+---
+
+### Q3: Sao UITask lại chạy được khi máy đang giặt? Nhấn nút lúc đó phải vô tác dụng chứ?
+
+**Đánh giá:** Câu hỏi hay nhất buổi — nó lộ ra chỗ đang **trộn lẫn hai tầng**.
+
+| Tầng | Câu hỏi | Ai quyết định |
+| --- | --- | --- |
+| Scheduler | UITask có được cấp CPU không? | Priority + Blocked/Ready. **Không biết gì về "đang giặt"** |
+| Ứng dụng | Lệnh đó có tác dụng không? | State machine của WashingManager |
+
+Scheduler hoàn toàn không có khái niệm "máy đang giặt". Nó chỉ thấy UITask prio
+2 vừa có message → Ready → tới lượt thì chạy.
+
+**"Vô tác dụng" thực ra được cài đặt bằng 3 mảnh trong code:**
+
+1. UITask **vẫn chạy đủ**, vẫn `xQueueSend(xCommandQueue, ...)`
+   (`ui_task.c:69-81`).
+2. WashingManager ở state WASHING **không đọc `xCommandQueue`**
+   (`washing_manager.c:291-297`) — chỉ đọc ở IDLE/FINISH/ERROR (`:249-254`).
+   Lệnh nằm im trong queue.
+3. Vì nằm im nên sẽ "nổ chậm" khi về IDLE → code chặn bằng
+   `(void)xQueueReset(xCommandQueue)` trong `Manager_OnEnterIdle()` /
+   `OnEnterFinish()` / `OnEnterError()` (`washing_manager.c:66-67`).
+
+**Pattern tổng quát rút ra:** *lọc sự kiện ở phía consumer (state machine),
+không phải ở phía producer.* Producer cứ đơn giản; toàn bộ tri thức về ngữ cảnh
+nằm gọn một chỗ — đúng Design Rule #1. Làm ngược lại (cho UITask tự hỏi "máy
+đang giặt à?") thì logic trạng thái bị rải ra 2 nơi và sẽ có lúc bất đồng.
+
+**Hệ quả kiểm chứng được trên board:** nhấn NAVIGATE (PA0) lúc đang giặt thì
+con trỏ menu trên OLED **vẫn di chuyển**, vì UITask gửi thẳng `xDisplayQueue`
+không qua WashingManager (`ui_task.c:60-67`). Feature hay bug là quyết định
+thiết kế, không phải tai nạn.
+
+---
+
+### Q4: "Software Timer chưa xong mà" — phản hồi về nhịp dạy
+
+**Bối cảnh:** Sau khi viết DD-05 và đánh dấu ✅ cho Software Timer trong bảng
+lộ trình, người dùng phản hồi hai lần liên tiếp:
+
+1. *"Software Timer chưa xong mà"*
+2. *"ý mình là kiến thức về Software Timer còn nhiều mà, sao chuyển sang bài
+   học khác sớm thế"*
+
+**Đánh giá — phản hồi đúng.** Rà lại DD-04 (mục 1–14) thì thấy mới dạy phần
+**dùng API**, thiếu hẳn phần **nội tại** và **thực chiến**. Đã bổ sung mục
+15–26, gồm cả **một đính chính**.
+
+**Nội dung đã bổ sung:**
+
+| Mục | Nội dung |
+| --- | --- |
+| 15 | Vòng đời timer — trạng thái **Dormant/Active** (thuật ngữ chính thức, `timers.h:111`), 3 bit `ucStatus` |
+| 16 | **Vì sao có HAI danh sách timer** — xử lý tick overflow, `prvSwitchTimerLists()` đổi con trỏ O(1) |
+| 17 | Vòng lặp thật của daemon chỉ 3 dòng; thứ tự "xử lý timer hết hạn TRƯỚC lệnh trong queue" |
+| 18 | Command queue đầy; gọi `xTimerStart()` trước scheduler thì `xTicksToWait` **bị ép về 0** |
+| 19 | Static allocation — `configSUPPORT_STATIC_ALLOCATION` mặc định 0 → project này **không dùng được** |
+| 20 | ⚠ **Đính chính mục 9** |
+| 21 | 6 API còn thiếu ở bảng mục 6 |
+| 22 | **Độ phức tạp O(n)** khi chèn; so sánh sorted list / min-heap / timer wheel / RB-tree |
+| 23 | Callback chạy trên **stack của daemon** (1040 B) — bug tràn stack ở task mình chưa từng viết |
+| 24 | **Reentrancy** — callback↔callback không cần mutex, callback↔task thì cần |
+| 25 | 8 pattern thực chiến (debounce, watchdog mềm, end-of-frame, backoff, throttle...) |
+| 26 | 5 trace hook timer; đo độ trễ daemon bằng cặp `COMMAND_SEND`→`COMMAND_RECEIVED` |
+
+**⚠ Đính chính quan trọng (mục 20):** buổi 1 dạy
+`xTimerPendFunctionCallFromISR()` như API sẵn dùng, nhưng
+`INCLUDE_xTimerPendFunctionCall` mặc định `0` (`FreeRTOS.h:283-284`) và project
+không khai → **hàm không được biên dịch**, gọi sẽ lỗi linker. Đây là **cùng
+một lỗi** đã mắc ở DD-01 mục 5 với `xEventGroupSetBitsFromISR` mà vẫn lặp lại.
+→ Nguyên tắc: *"API tồn tại trong FreeRTOS" ≠ "API dùng được trong build
+này"* — luôn kiểm tra macro `INCLUDE_*` / `configUSE_*` trước khi dạy.
+
+**Phát hiện thêm về code project:** cả **10 lời gọi**
+`xTimerStart()`/`xTimerStop()` trong `washing_manager.c` đều bỏ qua giá trị trả
+về — đúng lỗi kinh điển số 4 trong checklist DD-04 mục 12. Chưa gây hậu quả
+(`configTIMER_QUEUE_LENGTH = 10`, chỉ 4 timer) nhưng đã ghi nhận.
+
+**Bài học phương pháp (đã lưu vào memory):** không tự đánh dấu một chủ đề là
+✅ hoàn thành rồi chuyển sang chủ đề khác — **liệt kê thẳng những gì còn thiếu
+cho người học thấy và để họ quyết định khi nào chủ đề xong**. Trạng thái trong
+bảng lộ trình mặc định để 🔶.
+
+**Còn lại của DD-04 lúc đó:** (F) test logic phụ thuộc thời gian, (G) so sánh
+với timer của Linux / Zephyr / bare-metal. Đã dạy tiếp ở Q5, Q6 dưới đây —
+DD-04 khép lại trong buổi này.
+
+---
+
+### Q5: Tại sao mình đọc source FreeRTOS nhiều vậy?
+
+**Trả lời:** Hai lý do. (1) Chuẩn "sách giáo khoa, không bịa" mà người dùng
+đặt ra — bắt nguồn từ 7 lỗi thật đã mắc khi viết theo trí nhớ (sai tên macro,
+thiếu điều kiện biên dịch, trích sai số liệu). (2) Sâu hơn: ba loại thông tin
+chỉ đọc được, không suy luận được — cấu hình riêng của project (macro
+`INCLUDE_*`/`configUSE_*` không khai thì lấy default ẩn, ví dụ
+`INCLUDE_xTimerPendFunctionCall=0` khiến một API "không tồn tại" trong build
+này), chi tiết phụ thuộc phiên bản kernel (V11.1.0), và số liệu chính xác
+(44 byte `Timer_t`, 1040 byte stack daemon...) mà tài liệu sẽ dùng để tính
+toán thật về sau.
+
+Thừa nhận có phần dư: không phải lần tra cứu nào cũng cần — chỉ bắt buộc cho
+cấu hình/API compile được và cơ chế nội tại; khái niệm chung, pattern, câu
+hỏi phỏng vấn thì không cần đọc source mỗi lần.
+
+---
+
+### Q6: Test unit cho `washing_sm.c` — có loại bug nào không bắt được?
+
+**Trả lời của bạn:** "không biết" — hỏi ngược lại thay vì đoán.
+
+**Đáp án:** **Bug #17** (sticky `EVT_ERROR` trong `sensor_task.c:23-28`).
+`washing_sm.c` xử lý `WASH_EVT_ERROR` hoàn toàn đúng khi nhận được nó — test
+sẽ xanh. Nhưng bug nằm ở chỗ **sự kiện đó bị sinh ra sai** (bit không được
+clear khi đóng cửa lại), và việc sinh sự kiện nằm ở `sensor_task.c`, ngoài
+seam mà `washing_sm.c` test qua (đầu vào `WashEvent_t`, đầu ra callback).
+
+**Nguyên tắc rút ra:** seam dùng để tiêm phụ thuộc test cũng chính là ranh
+giới vùng mù của test — trả lời được "xử lý đúng sự kiện chưa" nhưng không
+trả lời được "có sinh đúng sự kiện không". Phát hiện thêm cùng hình dạng lỗi
+ở `EVT_WATER_FULL` (`sensor_task.c:30-32`, cũng thiếu nhánh `else` để clear).
+Đã ghi thành DD-04 mục 29 kèm bảng phân loại bug theo tầng và đề xuất tầng
+test "Component" (cảm biến giả) để bắt được loại này.
+
+---
+
 ## Session 06 — 2026-06-26 — Phase 8: SEGGER SystemView
 
 **Chủ đề:** RTT transport, queue registry, vQueueAddToRegistry, SEGGER_SYSVIEW_Conf/Start.

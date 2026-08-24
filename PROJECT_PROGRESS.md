@@ -457,3 +457,45 @@ After a full Wash cycle reaches `FINISH`, the machine stops responding to button
     a row) tied specifically to using the CubeMX GUI to change a pin —
     every future pin change on this project should budget for re-checking
     PA0 and NVIC priorities immediately after, not as an afterthought.
+
+### Change Record — Fix 3 Stale Doc Comments in app_events.h (2026-08-23)
+
+- **Goal:** During a mentoring session on Event Groups, three doc comments in
+  `app_events.h` were found to describe behavior the code does not have.
+  Fixed them so the header stops teaching the wrong thing.
+- **Files changed:**
+  - [`app_events.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/Common/Inc/app_events.h)
+  - [`QA_LOG.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/QA_LOG.md) (Session 09 added)
+- **What changed:**
+  - `EVT_TIMEOUT` comment claimed the timer callback sets the bit *"from ISR
+    context via `xEventGroupSetBitsFromISR()`"*. Corrected: `Timer_PhaseCallback()`
+    runs in the Timer Service Task (a real task), and uses the plain
+    `xEventGroupSetBits()`. Added a note that the bit is shared by all four
+    phase timers (TD-10) so its meaning is state-dependent.
+  - The file's "Usage example" demonstrated a **blocking** guard
+    (`WaitBits(EVT_DOOR_CLOSED, portMAX_DELAY)`) — an anti-pattern, since a
+    blocked WashingManager cannot tell the user why it refused to start.
+    Replaced with an example contrasting the two correct uses: `WaitBits`
+    for awaiting a future event, `GetBits` for a non-blocking precondition
+    check. The old example also named a handle that does not exist
+    (`hSystemEvents` vs the real `xSystemEvents`).
+  - `EVT_ERROR` comment said it *"clears only on CMD_RESET"* — wrong twice
+    over: the `CMD_RESET` case was deleted earlier as dead code, and the bit
+    is actually cleared both by `Manager_OnEnterIdle()` and automatically by
+    `WaitBits(..., xClearOnExit = pdTRUE)`.
+- **Why it changed:** these comments are the first thing a reader consults to
+  understand the event group; leaving them stale actively teaches incorrect
+  FreeRTOS semantics (particularly the ISR-vs-task distinction, which is a
+  core learning goal of this project).
+- **What I should learn from it:**
+  - Comments are not compiler-checked, so they drift silently. This project
+    has now had four separate cases of a comment describing behavior the code
+    never had (Bug #12, plus these three) — always verify a comment against
+    the code before trusting it.
+  - `xEventGroupSetBitsFromISR()` is a *deferred* operation routed through
+    the timer daemon task and can return `pdFAIL`; it is not a drop-in
+    equivalent of `xQueueSendFromISR()`.
+  - Guard conditions must be checked non-blocking (`GetBits`) at the single
+    point every path must pass through — not inside one particular state.
+    The current design still lacks such a guard: the `IDLE → SPIN` path
+    performs no door check at all (documented, not yet fixed).

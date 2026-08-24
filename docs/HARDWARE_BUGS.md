@@ -1029,6 +1029,91 @@ chắc chắn là lỗi ở khâu đo/dây/nút chứ không phải ở từng c
 
 ---
 
+## Bug #17 — Sticky Level Flag: `EVT_ERROR` Không Bao Giờ Được Clear Khi Cửa Đóng Lại (CHƯA FIX)
+
+### Triệu chứng (dự đoán từ đọc code, chờ kiểm chứng đầy đủ)
+
+Sau khi mở cửa rồi đóng lại ở trạng thái `IDLE` — thao tác tự nhiên nhất khi
+bỏ quần áo vào máy — bấm Start sẽ **không giặt được**: OLED nháy `FILL WATER`
+trong vài chục micro giây rồi lập tức nhảy sang `ERROR`. Phải bấm Start
+thêm 2 lần nữa (lần 2 reset về `IDLE`, lần 3 mới chạy thật).
+
+### Root Cause
+
+`sensor_task.c` duy trì `EVT_ERROR` **bất đối xứng** — có đường lên, không có
+đường xuống:
+
+```c
+if (BSP_Sensor_IsDoorClosed()) {
+    xEventGroupSetBits(xSystemEvents, EVT_DOOR_CLOSED);
+    /* ← KHÔNG có xEventGroupClearBits(EVT_ERROR) tương ứng */
+} else {
+    xEventGroupClearBits(xSystemEvents, EVT_DOOR_CLOSED);
+    xEventGroupSetBits(xSystemEvents, EVT_ERROR);
+}
+```
+
+Trace theo thao tác người dùng:
+
+| Bước | Hành động | `EVT_DOOR_CLOSED` | `EVT_ERROR` |
+| --- | --- | --- | --- |
+| 1 | `IDLE`, cửa đóng | 1 | 0 (do `Manager_OnEnterIdle()` clear) |
+| 2 | Mở cửa bỏ đồ | 0 | **1** |
+| 3 | Đóng cửa | 1 | **1** ← dính lại |
+| 4 | Bấm Start | 1 | **1** |
+
+Ở bước 4, `Manager_OnEnterFillWater()` mở van rồi vòng lặp gọi:
+
+```c
+xEventGroupWaitBits(xSystemEvents,
+                    EVT_WATER_FULL | EVT_TIMEOUT | EVT_ERROR,
+                    pdTRUE, pdFALSE, portMAX_DELAY);
+```
+
+`EVT_ERROR` đã bằng 1 sẵn → hàm **không block, trả về ngay** → khớp dòng
+`{ FILL_WATER, WASH_EVT_ERROR, ERROR }` trong `kTransitions[]` → vào `ERROR`.
+
+Lý do bug này ẩn lâu nay: cửa được mô phỏng bằng nút toggle PD5 với mặc định
+`s_doorClosed = 1`; nếu chưa từng bấm PD5 thì `EVT_ERROR` chưa từng được set.
+
+**`EVT_WATER_FULL` mắc đúng bệnh này** — cũng không có nhánh `else` để clear.
+Hệ quả: nếu PD6 đang ở trạng thái "đầy" từ chu trình trước, lần vào
+`FILL_WATER` kế tiếp sẽ nhảy thẳng sang `WASHING` mà không nạp nước.
+
+### Trạng thái
+
+**Đã phát hiện, CHƯA fix** — theo quyết định của người dùng: ưu tiên học để
+làm chủ project trước, sửa sau. Ba phương án đã phân tích:
+
+- **A — Cho SensorTask clear `EVT_ERROR` ở nhánh `if`.** Đơn giản nhưng
+  **sai về ownership**: `EVT_ERROR` còn do fill-timeout (`Manager_OnEnterError`)
+  gây ra, SensorTask clear sẽ xóa nhầm lỗi của module khác.
+- **B — Tách cờ theo nguyên nhân** (khuyến nghị): SensorTask chỉ sở hữu
+  `EVT_DOOR_CLOSED` (level, đối xứng); WashingManager tự suy ra lỗi cửa từ
+  level đó thay vì dùng `EVT_ERROR` chung. Mỗi bit một chủ sở hữu duy nhất.
+  Cùng tinh thần với đề xuất tách `EVT_TIMEOUT` thành 4 bit theo phase.
+- **C — Consumer dọn cờ trước khi "vũ trang"**: thêm
+  `xEventGroupClearBits(EVT_ERROR | EVT_WATER_FULL)` vào đầu
+  `Manager_OnEnterFillWater()`, theo đúng pattern `Manager_OnEnterIdle()`
+  đang dùng. Rẻ nhất nhưng chỉ xử lý cờ *cũ*, không thay thế được **guard**
+  kiểm tra điều kiện lúc bắt đầu.
+
+Lời giải đầy đủ là **B (hoặc C) + guard** — hai thứ giải quyết hai vấn đề
+khác nhau: cờ đối xứng đảm bảo thông tin không cũ, guard chặn khởi động khi
+điều kiện an toàn chưa thỏa.
+
+### Bài học
+
+| Khái niệm | Giải thích |
+| --- | --- |
+| Sticky / stale level flag | Cờ biểu diễn *trạng thái hiện tại* nhưng chỉ có code set mà không có code clear tương ứng → cờ mô tả **quá khứ**, tức là nó nói dối. Không crash, không warning, chỉ hành xử sai |
+| Cờ level phải đối xứng | Đã dùng một bit làm level thì **mọi nhánh** của producer đều phải cập nhật nó (`if` set thì `else` phải clear) — thiếu một nhánh là đủ hỏng |
+| Một bit, một chủ sở hữu | `EVT_ERROR` đang có 2 producer (SensorTask + WashingManager) nên không ai dám clear an toàn. Bit dùng chung nhiều nguồn thì nên tách, hoặc chỉ định rõ **một** chủ thể chịu trách nhiệm clear |
+| Bug phụ thuộc lịch sử | Chỉ lộ ra sau một *chuỗi* thao tác (mở → đóng → start), test từng chức năng riêng lẻ không bao giờ thấy — cần test theo kịch bản người dùng thật |
+| Triệu chứng ở xa nguyên nhân | Bug nằm ở `sensor_task.c` nhưng biểu hiện ở `washing_manager.c`, cách nhau 2 module — lý do phải trace theo *dữ liệu* (bit), không chỉ theo *luồng gọi hàm* |
+
+---
+
 ## Tổng kết — Timeline fix
 
 ```
