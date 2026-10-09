@@ -1,270 +1,357 @@
-<!DOCTYPE html><html><head>
-      <title>PROJECT_SPEC</title>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      
-      <link rel="stylesheet" href="file:///c:\Users\Dell\.vscode\extensions\gicentre.markdown-preview-enhanced-with-litvis-0.31.0\node_modules\mume-with-litvis\dependencies\katex\katex.min.css">
-      
-      
-      
-      <script type="text/javascript" src="file:///c:\Users\Dell\.vscode\extensions\gicentre.markdown-preview-enhanced-with-litvis-0.31.0\node_modules\mume-with-litvis\dependencies\mermaid\mermaid.min.js" charset="UTF-8"></script>
-      
-      
-      
-      
-      
-      <style>
-      /**
- * prism.js Github theme based on GitHub's theme.
- * @author Sam Clarke
- */
-code[class*="language-"],
-pre[class*="language-"] {
-  color: #333;
-  background: none;
-  font-family: Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  text-align: left;
-  white-space: pre;
-  word-spacing: normal;
-  word-break: normal;
-  word-wrap: normal;
-  line-height: 1.4;
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Washing Machine Simulator - Project Specification</title>
+<!--
+  GENERATED FILE — do not edit by hand.
+  Source of truth: PROJECT_SPEC.md
+  Rebuild:         cd tools && npm install && npm run build
+  Diagrams are drawn by Mermaid, loaded from a CDN (internet needed to draw them;
+  without it the diagram source is shown as text).
+-->
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('doc-theme'); } catch (e) {}
+    if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<style>
+/* ==========================================================================
+   Doc viewer styles — inlined into every generated page by build_docs.mjs.
+   ========================================================================== */
 
-  -moz-tab-size: 8;
-  -o-tab-size: 8;
-  tab-size: 8;
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --panel: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --accent: #0969da;
+  --accent-soft: #ddf4ff;
+  --bar-h: 48px;
+  --toc-w: 290px;
 
-  -webkit-hyphens: none;
-  -moz-hyphens: none;
-  -ms-hyphens: none;
-  hyphens: none;
+  --hl-kw: #cf222e;
+  --hl-str: #0a3069;
+  --hl-com: #6e7781;
+  --hl-num: #0550ae;
+  --hl-fn: #8250df;
+  --hl-type: #953800;
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #9198a1;
+  --border: #3d444d;
+  --panel: #151b23;
+  --code-bg: #151b23;
+  --accent: #4493f8;
+  --accent-soft: #10243f;
+
+  --hl-kw: #ff7b72;
+  --hl-str: #a5d6ff;
+  --hl-com: #8b949e;
+  --hl-num: #79c0ff;
+  --hl-fn: #d2a8ff;
+  --hl-type: #ffa657;
 }
 
-/* Code blocks */
-pre[class*="language-"] {
-  padding: .8em;
-  overflow: auto;
-  /* border: 1px solid #ddd; */
-  border-radius: 3px;
-  /* background: #fff; */
-  background: #f5f5f5;
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--bar-h) + 12px); color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+html.dg-lock { overflow: hidden; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
 }
 
-/* Inline code */
-:not(pre) > code[class*="language-"] {
-  padding: .1em;
-  border-radius: .3em;
-  white-space: normal;
-  background: #f5f5f5;
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  height: var(--bar-h);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 600; color: var(--fg); text-decoration: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex: 0 1 auto;
+}
+.docnav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; }
+.docnav a {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+}
+.docnav a:hover { background: var(--panel); color: var(--fg); }
+.docnav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.icon-btn {
+  font: inherit; font-size: 18px; line-height: 1;
+  width: 34px; height: 34px; border-radius: 6px;
+  background: transparent; color: var(--fg);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.icon-btn:hover { background: var(--panel); }
+.toc-toggle { display: none; }
+
+/* ---------- layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: var(--toc-w) minmax(0, 1fr);
+  max-width: 1560px; margin: 0 auto;
+}
+.toc {
+  position: sticky; top: var(--bar-h);
+  height: calc(100vh - var(--bar-h));
+  overflow-y: auto;
+  padding: 18px 10px 40px 14px;
+  border-right: 1px solid var(--border);
+  font-size: 14px; line-height: 1.4;
+}
+.toc ul, .toc ol { list-style: none; margin: 0; padding: 0; }
+.toc a {
+  display: block; color: var(--muted); text-decoration: none;
+  padding: 4px 8px; border-radius: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toc a:hover { background: var(--panel); color: var(--fg); }
+.toc a.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.toc li.grp > a { color: var(--fg); font-weight: 600; margin-top: 4px; }
+.toc li.grp > ul { display: none; margin-left: 10px; border-left: 1px solid var(--border); padding-left: 4px; }
+.toc li.grp.open > ul { display: block; }
+.content { padding: 28px 36px 96px; min-width: 0; }
+.content > * { max-width: 1040px; }
+
+/* ---------- typography ---------- */
+h1, h2, h3, h4 { line-height: 1.25; text-wrap: balance; position: relative; }
+h1 { font-size: 2em; margin: 2em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+.content > h1:first-child { margin-top: 0; }
+h2 { font-size: 1.5em; margin: 2em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.2em; margin: 1.6em 0 .5em; }
+h4 { font-size: 1em; margin: 1.4em 0 .4em; }
+.anchor {
+  position: absolute; left: -1.1em; padding-right: .3em;
+  color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400;
+}
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+p, ul, ol { margin: .8em 0; }
+li + li { margin-top: .25em; }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+blockquote {
+  margin: 1em 0; padding: .1em 1em;
+  color: var(--muted); border-left: 4px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+blockquote > :first-child { margin-top: .6em; }
+blockquote > :last-child  { margin-bottom: .6em; }
+code {
+  font-family: "Cascadia Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: .88em; background: var(--code-bg);
+  padding: .15em .4em; border-radius: 5px;
+}
+pre.code {
+  position: relative; margin: 1em 0; padding: 14px 16px; overflow: auto;
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  line-height: 1.5; font-size: 13.5px;
+}
+pre.code code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+pre.code[data-lang]:not([data-lang=""])::before {
+  content: attr(data-lang); position: absolute; top: 3px; right: 9px;
+  font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+}
+.hljs-keyword, .hljs-literal, .hljs-selector-tag { color: var(--hl-kw); }
+.hljs-string, .hljs-regexp { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-symbol, .hljs-bullet { color: var(--hl-num); }
+.hljs-title, .hljs-title.function_, .hljs-section { color: var(--hl-fn); }
+.hljs-type, .hljs-built_in, .hljs-class .hljs-title { color: var(--hl-type); }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--hl-kw); }
+.hljs-meta .hljs-string { color: var(--hl-str); }
+.hljs-addition { color: #1a7f37; } .hljs-deletion { color: #cf222e; }
+
+.table-wrap { overflow-x: auto; margin: 1em 0; }
+table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: .95em; }
+th, td { border: 1px solid var(--border); padding: 6px 12px; vertical-align: top; }
+th { background: var(--panel); text-align: left; }
+tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 45%, transparent); }
+img { max-width: 100%; }
+
+.doc-footer {
+  margin-top: 4em; padding-top: 1em; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 13px;
 }
 
-.token.comment,
-.token.blockquote {
-  color: #969896;
+/* ---------- diagrams (zoom / pan) ---------- */
+.dg-slot { margin: 1.2em 0; max-width: none !important; }
+.diagram {
+  margin: 0; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.dg-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.dg-title { font-weight: 600; flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-hint  { color: var(--muted); }
+.dg-btns { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.dg-btns button {
+  font: inherit; font-size: 13px; line-height: 1.2;
+  min-width: 30px; padding: 3px 9px; border-radius: 6px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.dg-btns button:hover { border-color: var(--accent); color: var(--accent); }
+.dg-zoom { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dg-view {
+  position: relative; height: 420px; overflow: hidden; outline: none;
+  cursor: grab; user-select: none; -webkit-user-select: none;
+  background-color: var(--bg);
+  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  touch-action: pan-x pan-y;
+}
+.dg-view:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.dg-view.grabbing { cursor: grabbing; }
+.dg-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.dg-stage svg { display: block; max-width: none !important; }
+.dg-msg { padding: 16px; color: var(--muted); font-size: 14px; }
+.dg-err pre { margin: 8px 0 0; padding: 10px; background: var(--code-bg); border-radius: 6px; overflow: auto; font-size: 12.5px; }
+
+.diagram.is-full {
+  position: fixed; inset: 0; z-index: 200; border: 0; border-radius: 0;
+  background: var(--bg);
+}
+.diagram.is-full .dg-view { flex: 1 1 auto; height: auto !important; touch-action: none; }
+.diagram.is-full .dg-bar { padding: 10px 14px; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .toc-toggle { display: inline-block; }
+  .toc {
+    position: fixed; top: var(--bar-h); left: 0; bottom: 0; z-index: 60;
+    width: min(86vw, 340px); height: auto;
+    background: var(--bg); transform: translateX(-102%);
+    transition: transform .18s ease; box-shadow: 4px 0 18px rgba(0,0,0,.18);
+  }
+  body.toc-open .toc { transform: none; }
+  .content { padding: 20px 16px 80px; }
+  .dg-hint { display: none; }
+  .anchor { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .toc { transition: none; }
+}
+@media print {
+  .topbar, .toc, .dg-bar { display: none !important; }
+  .layout { display: block; }
+  .dg-view { height: auto !important; overflow: visible; }
 }
 
-.token.cdata {
-  color: #183691;
-}
-
-.token.doctype,
-.token.punctuation,
-.token.variable,
-.token.macro.property {
-  color: #333;
-}
-
-.token.operator,
-.token.important,
-.token.keyword,
-.token.rule,
-.token.builtin {
-  color: #a71d5d;
-}
-
-.token.string,
-.token.url,
-.token.regex,
-.token.attr-value {
-  color: #183691;
-}
-
-.token.property,
-.token.number,
-.token.boolean,
-.token.entity,
-.token.atrule,
-.token.constant,
-.token.symbol,
-.token.command,
-.token.code {
-  color: #0086b3;
-}
-
-.token.tag,
-.token.selector,
-.token.prolog {
-  color: #63a35c;
-}
-
-.token.function,
-.token.namespace,
-.token.pseudo-element,
-.token.class,
-.token.class-name,
-.token.pseudo-class,
-.token.id,
-.token.url-reference .token.variable,
-.token.attr-name {
-  color: #795da3;
-}
-
-.token.entity {
-  cursor: help;
-}
-
-.token.title,
-.token.title .token.punctuation {
-  font-weight: bold;
-  color: #1d3e81;
-}
-
-.token.list {
-  color: #ed6a43;
-}
-
-.token.inserted {
-  background-color: #eaffea;
-  color: #55a532;
-}
-
-.token.deleted {
-  background-color: #ffecec;
-  color: #bd2c00;
-}
-
-.token.bold {
-  font-weight: bold;
-}
-
-.token.italic {
-  font-style: italic;
-}
-
-
-/* JSON */
-.language-json .token.property {
-  color: #183691;
-}
-
-.language-markup .token.tag .token.punctuation {
-  color: #333;
-}
-
-/* CSS */
-code.language-css,
-.language-css .token.function {
-  color: #0086b3;
-}
-
-/* YAML */
-.language-yaml .token.atrule {
-  color: #63a35c;
-}
-
-code.language-yaml {
-  color: #183691;
-}
-
-/* Ruby */
-.language-ruby .token.function {
-  color: #333;
-}
-
-/* Markdown */
-.language-markdown .token.url {
-  color: #795da3;
-}
-
-/* Makefile */
-.language-makefile .token.symbol {
-  color: #795da3;
-}
-
-.language-makefile .token.variable {
-  color: #183691;
-}
-
-.language-makefile .token.builtin {
-  color: #0086b3;
-}
-
-/* Bash */
-.language-bash .token.keyword {
-  color: #0086b3;
-}
-
-/* highlight */
-pre[data-line] {
-  position: relative;
-  padding: 1em 0 1em 3em;
-}
-pre[data-line] .line-highlight-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  background-color: transparent;
-  display: block;
-  width: 100%;
-}
-
-pre[data-line] .line-highlight {
-  position: absolute;
-  left: 0;
-  right: 0;
-  padding: inherit 0;
-  margin-top: 1em;
-  background: hsla(24, 20%, 50%,.08);
-  background: linear-gradient(to right, hsla(24, 20%, 50%,.1) 70%, hsla(24, 20%, 50%,0));
-  pointer-events: none;
-  line-height: inherit;
-  white-space: pre;
-}
-
-pre[data-line] .line-highlight:before, 
-pre[data-line] .line-highlight[data-end]:after {
-  content: attr(data-start);
-  position: absolute;
-  top: .4em;
-  left: .6em;
-  min-width: 1em;
-  padding: 0 .5em;
-  background-color: hsla(24, 20%, 50%,.4);
-  color: hsl(24, 20%, 95%);
-  font: bold 65%/1.5 sans-serif;
-  text-align: center;
-  vertical-align: .3em;
-  border-radius: 999px;
-  text-shadow: none;
-  box-shadow: 0 1px white;
-}
-
-pre[data-line] .line-highlight[data-end]:after {
-  content: attr(data-end);
-  top: auto;
-  bottom: .4em;
-}html body{font-family:"Helvetica Neue",Helvetica,"Segoe UI",Arial,freesans,sans-serif;font-size:16px;line-height:1.6;color:#333;background-color:#fff;overflow:initial;box-sizing:border-box;word-wrap:break-word}html body>:first-child{margin-top:0}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{line-height:1.2;margin-top:1em;margin-bottom:16px;color:#000}html body h1{font-size:2.25em;font-weight:300;padding-bottom:.3em}html body h2{font-size:1.75em;font-weight:400;padding-bottom:.3em}html body h3{font-size:1.5em;font-weight:500}html body h4{font-size:1.25em;font-weight:600}html body h5{font-size:1.1em;font-weight:600}html body h6{font-size:1em;font-weight:600}html body h1,html body h2,html body h3,html body h4,html body h5{font-weight:600}html body h5{font-size:1em}html body h6{color:#5c5c5c}html body strong{color:#000}html body del{color:#5c5c5c}html body a:not([href]){color:inherit;text-decoration:none}html body a{color:#08c;text-decoration:none}html body a:hover{color:#00a3f5;text-decoration:none}html body img{max-width:100%}html body>p{margin-top:0;margin-bottom:16px;word-wrap:break-word}html body>ul,html body>ol{margin-bottom:16px}html body ul,html body ol{padding-left:2em}html body ul.no-list,html body ol.no-list{padding:0;list-style-type:none}html body ul ul,html body ul ol,html body ol ol,html body ol ul{margin-top:0;margin-bottom:0}html body li{margin-bottom:0}html body li.task-list-item{list-style:none}html body li>p{margin-top:0;margin-bottom:0}html body .task-list-item-checkbox{margin:0 .2em .25em -1.8em;vertical-align:middle}html body .task-list-item-checkbox:hover{cursor:pointer}html body blockquote{margin:16px 0;font-size:inherit;padding:0 15px;color:#5c5c5c;background-color:#f0f0f0;border-left:4px solid #d6d6d6}html body blockquote>:first-child{margin-top:0}html body blockquote>:last-child{margin-bottom:0}html body hr{height:4px;margin:32px 0;background-color:#d6d6d6;border:0 none}html body table{margin:10px 0 15px 0;border-collapse:collapse;border-spacing:0;display:block;width:100%;overflow:auto;word-break:normal;word-break:keep-all}html body table th{font-weight:bold;color:#000}html body table td,html body table th{border:1px solid #d6d6d6;padding:6px 13px}html body dl{padding:0}html body dl dt{padding:0;margin-top:16px;font-size:1em;font-style:italic;font-weight:bold}html body dl dd{padding:0 16px;margin-bottom:16px}html body code{font-family:Menlo,Monaco,Consolas,'Courier New',monospace;font-size:.85em !important;color:#000;background-color:#f0f0f0;border-radius:3px;padding:.2em 0}html body code::before,html body code::after{letter-spacing:-0.2em;content:"\00a0"}html body pre>code{padding:0;margin:0;font-size:.85em !important;word-break:normal;white-space:pre;background:transparent;border:0}html body .highlight{margin-bottom:16px}html body .highlight pre,html body pre{padding:1em;overflow:auto;font-size:.85em !important;line-height:1.45;border:#d6d6d6;border-radius:3px}html body .highlight pre{margin-bottom:0;word-break:normal}html body pre code,html body pre tt{display:inline;max-width:initial;padding:0;margin:0;overflow:initial;line-height:inherit;word-wrap:normal;background-color:transparent;border:0}html body pre code:before,html body pre tt:before,html body pre code:after,html body pre tt:after{content:normal}html body p,html body blockquote,html body ul,html body ol,html body dl,html body pre{margin-top:0;margin-bottom:16px}html body kbd{color:#000;border:1px solid #d6d6d6;border-bottom:2px solid #c7c7c7;padding:2px 4px;background-color:#f0f0f0;border-radius:3px}@media print{html body{background-color:#fff}html body h1,html body h2,html body h3,html body h4,html body h5,html body h6{color:#000;page-break-after:avoid}html body blockquote{color:#5c5c5c}html body pre{page-break-inside:avoid}html body table{display:table}html body img{display:block;max-width:100%;max-height:100%}html body pre,html body code{word-wrap:break-word;white-space:pre}}.markdown-preview{width:100%;height:100%;box-sizing:border-box}.markdown-preview .pagebreak,.markdown-preview .newpage{page-break-before:always}.markdown-preview pre.line-numbers{position:relative;padding-left:3.8em;counter-reset:linenumber}.markdown-preview pre.line-numbers>code{position:relative}.markdown-preview pre.line-numbers .line-numbers-rows{position:absolute;pointer-events:none;top:1em;font-size:100%;left:0;width:3em;letter-spacing:-1px;border-right:1px solid #999;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none;user-select:none}.markdown-preview pre.line-numbers .line-numbers-rows>span{pointer-events:none;display:block;counter-increment:linenumber}.markdown-preview pre.line-numbers .line-numbers-rows>span:before{content:counter(linenumber);color:#999;display:block;padding-right:.8em;text-align:right}.markdown-preview .mathjax-exps .MathJax_Display{text-align:center !important}.markdown-preview:not([for="preview"]) .code-chunk .btn-group{display:none}.markdown-preview:not([for="preview"]) .code-chunk .status{display:none}.markdown-preview:not([for="preview"]) .code-chunk .output-div{margin-bottom:16px}.markdown-preview .md-toc{padding:0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link p,.markdown-preview .md-toc .md-toc-link-wrapper .md-toc-link div{display:inline}.markdown-preview .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}.scrollbar-style::-webkit-scrollbar{width:8px}.scrollbar-style::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}.scrollbar-style::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,0.66);border:4px solid rgba(150,150,150,0.66);background-clip:content-box}html body[for="html-export"]:not([data-presentation-mode]){position:relative;width:100%;height:100%;top:0;left:0;margin:0;padding:0;overflow:auto}html body[for="html-export"]:not([data-presentation-mode]) .markdown-preview{position:relative;top:0}@media screen and (min-width:914px){html body[for="html-export"]:not([data-presentation-mode]) .markdown-preview{padding:2em calc(50% - 457px + 2em)}}@media screen and (max-width:914px){html body[for="html-export"]:not([data-presentation-mode]) .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for="html-export"]:not([data-presentation-mode]) .markdown-preview{font-size:14px !important;padding:1em}}@media print{html body[for="html-export"]:not([data-presentation-mode]) #sidebar-toc-btn{display:none}}html body[for="html-export"]:not([data-presentation-mode]) #sidebar-toc-btn{position:fixed;bottom:8px;left:8px;font-size:28px;cursor:pointer;color:inherit;z-index:99;width:32px;text-align:center;opacity:.4}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] #sidebar-toc-btn{opacity:1}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc{position:fixed;top:0;left:0;width:300px;height:100%;padding:32px 0 48px 0;font-size:14px;box-shadow:0 0 4px rgba(150,150,150,0.33);box-sizing:border-box;overflow:auto;background-color:inherit}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar{width:8px}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-track{border-radius:10px;background-color:transparent}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc::-webkit-scrollbar-thumb{border-radius:5px;background-color:rgba(150,150,150,0.66);border:4px solid rgba(150,150,150,0.66);background-clip:content-box}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc a{text-decoration:none}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc{padding:0 16px}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link{display:inline;padding:.25rem 0}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link p,html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper .md-toc-link div{display:inline}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .md-sidebar-toc .md-toc .md-toc-link-wrapper.highlighted .md-toc-link{font-weight:800}html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{left:300px;width:calc(100% -  300px);padding:2em calc(50% - 457px -  300px/2);margin:0;box-sizing:border-box}@media screen and (max-width:1274px){html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{padding:2em}}@media screen and (max-width:450px){html body[for="html-export"]:not([data-presentation-mode])[html-show-sidebar-toc] .markdown-preview{width:100%}}html body[for="html-export"]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .markdown-preview{left:50%;transform:translateX(-50%)}html body[for="html-export"]:not([data-presentation-mode]):not([html-show-sidebar-toc]) .md-sidebar-toc{display:none}
-/* Please visit the URL below for more information: */
-/*   https://shd101wyy.github.io/markdown-preview-enhanced/#/customize-css */
-
-      </style>
-    </head>
-    <body for="html-export">
-      <div class="mume markdown-preview  ">
-      <h1 class="mume-header" id="washing-machine-simulator---project-specification">Washing Machine Simulator - Project Specification</h1>
-
-<h2 class="mume-header" id="1-project-goal">1. Project Goal</h2>
-
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
+  <a class="brand" href="#top">Washing Machine Simulator</a>
+  <nav class="docnav" aria-label="Bộ tài liệu"><a href="docs/START_HERE.html">Học FreeRTOS</a><a href="docs/SYSTEM_DIAGRAMS.html">Sơ đồ hệ thống</a><a href="PROJECT_SPEC.html" aria-current="page">Đặc tả</a></nav>
+  <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
+</header>
+<div class="layout" id="top">
+  <nav class="toc" aria-label="Mục lục">
+    <ul>
+      <li class="grp"><a href="#washing-machine-simulator---project-specification" data-id="washing-machine-simulator---project-specification" title="Washing Machine Simulator - Project Specification">Washing Machine Simulator - Project Specification</a>
+        <ul>
+          <li><a href="#1-project-goal" data-id="1-project-goal" title="1. Project Goal">1. Project Goal</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#2-hardware-platform" data-id="2-hardware-platform" title="2. Hardware Platform">2. Hardware Platform</a>
+        <ul>
+          <li><a href="#board" data-id="board" title="Board">Board</a></li>
+          <li><a href="#mcu" data-id="mcu" title="MCU">MCU</a></li>
+          <li><a href="#ide" data-id="ide" title="IDE">IDE</a></li>
+          <li><a href="#rtos" data-id="rtos" title="RTOS">RTOS</a></li>
+          <li><a href="#debug-tools" data-id="debug-tools" title="Debug Tools">Debug Tools</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#3-hardware-configuration" data-id="3-hardware-configuration" title="3. Hardware Configuration">3. Hardware Configuration</a>
+        <ul>
+          <li><a href="#user-input" data-id="user-input" title="User Input">User Input</a></li>
+          <li><a href="#oled-display" data-id="oled-display" title="OLED Display">OLED Display</a></li>
+          <li><a href="#simulation-outputs" data-id="simulation-outputs" title="Simulation Outputs">Simulation Outputs</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#4-washing-modes" data-id="4-washing-modes" title="4. Washing Modes">4. Washing Modes</a>
+        <ul>
+          <li><a href="#wash-mode" data-id="wash-mode" title="Wash Mode">Wash Mode</a></li>
+          <li><a href="#spin-mode" data-id="spin-mode" title="Spin Mode">Spin Mode</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#5-user-interface" data-id="5-user-interface" title="5. User Interface">5. User Interface</a>
+      </li>
+      <li class="grp"><a href="#6-state-machine" data-id="6-state-machine" title="6. State Machine">6. State Machine</a>
+      </li>
+      <li class="grp"><a href="#7-rtos-architecture" data-id="7-rtos-architecture" title="7. RTOS Architecture">7. RTOS Architecture</a>
+      </li>
+      <li class="grp"><a href="#8-task-design" data-id="8-task-design" title="8. Task Design">8. Task Design</a>
+        <ul>
+          <li><a href="#ui-task" data-id="ui-task" title="UI Task">UI Task</a></li>
+          <li><a href="#washingmanager-task" data-id="washingmanager-task" title="WashingManager Task">WashingManager Task</a></li>
+          <li><a href="#sensor-task" data-id="sensor-task" title="Sensor Task">Sensor Task</a></li>
+          <li><a href="#oled-task" data-id="oled-task" title="OLED Task">OLED Task</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#9-rtos-objects" data-id="9-rtos-objects" title="9. RTOS Objects">9. RTOS Objects</a>
+        <ul>
+          <li><a href="#queues" data-id="queues" title="Queues">Queues</a></li>
+          <li><a href="#event-group" data-id="event-group" title="Event Group">Event Group</a></li>
+          <li><a href="#software-timers" data-id="software-timers" title="Software Timers">Software Timers</a></li>
+          <li><a href="#mutex" data-id="mutex" title="Mutex">Mutex</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#10-simulation-timing" data-id="10-simulation-timing" title="10. Simulation Timing">10. Simulation Timing</a>
+      </li>
+      <li class="grp"><a href="#11-hardware-verification" data-id="11-hardware-verification" title="11. Hardware Verification">11. Hardware Verification</a>
+        <ul>
+          <li><a href="#logic-analyzer-connections" data-id="logic-analyzer-connections" title="Logic Analyzer Connections">Logic Analyzer Connections</a></li>
+          <li><a href="#expected-wash-sequence" data-id="expected-wash-sequence" title="Expected Wash Sequence">Expected Wash Sequence</a></li>
+          <li><a href="#expected-spin-sequence" data-id="expected-spin-sequence" title="Expected Spin Sequence">Expected Spin Sequence</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#12-error-handling" data-id="12-error-handling" title="12. Error Handling">12. Error Handling</a>
+        <ul>
+          <li><a href="#door-open" data-id="door-open" title="Door Open">Door Open</a></li>
+          <li><a href="#water-fill-timeout" data-id="water-fill-timeout" title="Water Fill Timeout">Water Fill Timeout</a></li>
+        </ul>
+      </li>
+      <li class="grp"><a href="#13-design-rules" data-id="13-design-rules" title="13. Design Rules">13. Design Rules</a>
+      </li>
+      <li class="grp"><a href="#14-future-extensions" data-id="14-future-extensions" title="14. Future Extensions">14. Future Extensions</a>
+      </li>
+      <li class="grp"><a href="#15-development-roadmap" data-id="15-development-roadmap" title="15. Development Roadmap">15. Development Roadmap</a>
+      </li>
+    </ul>
+  </nav>
+  <main class="content">
+<h1 id="washing-machine-simulator---project-specification">Washing Machine Simulator - Project Specification<a class="anchor" href="#washing-machine-simulator---project-specification" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="1-project-goal">1. Project Goal<a class="anchor" href="#1-project-goal" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Build a washing machine simulator on STM32F411E-DISCO to learn FreeRTOS through a realistic embedded application.</p>
 <p>The project should demonstrate practical usage of:</p>
 <ul>
@@ -281,27 +368,21 @@ pre[data-line] .line-highlight[data-end]:after {
 </ul>
 <p>The focus is on understanding RTOS architecture and inter-task communication rather than building a commercial washing machine product.</p>
 <hr>
-<h1 class="mume-header" id="2-hardware-platform">2. Hardware Platform</h1>
-
-<h2 class="mume-header" id="board">Board</h2>
-
+<h1 id="2-hardware-platform">2. Hardware Platform<a class="anchor" href="#2-hardware-platform" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="board">Board<a class="anchor" href="#board" aria-label="Liên kết tới mục này">#</a></h2>
 <p>STM32F411E-DISCO</p>
-<h2 class="mume-header" id="mcu">MCU</h2>
-
+<h2 id="mcu">MCU<a class="anchor" href="#mcu" aria-label="Liên kết tới mục này">#</a></h2>
 <p>STM32F411VETx</p>
 <ul>
 <li>ARM Cortex-M4F</li>
 <li>512 KB Flash</li>
 <li>128 KB SRAM</li>
 </ul>
-<h2 class="mume-header" id="ide">IDE</h2>
-
+<h2 id="ide">IDE<a class="anchor" href="#ide" aria-label="Liên kết tới mục này">#</a></h2>
 <p>STM32CubeIDE</p>
-<h2 class="mume-header" id="rtos">RTOS</h2>
-
+<h2 id="rtos">RTOS<a class="anchor" href="#rtos" aria-label="Liên kết tới mục này">#</a></h2>
 <p>FreeRTOS</p>
-<h2 class="mume-header" id="debug-tools">Debug Tools</h2>
-
+<h2 id="debug-tools">Debug Tools<a class="anchor" href="#debug-tools" aria-label="Liên kết tới mục này">#</a></h2>
 <ul>
 <li>ST-Link</li>
 <li>SEGGER RTT</li>
@@ -309,27 +390,57 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>Logic Analyzer</li>
 </ul>
 <hr>
-<h1 class="mume-header" id="3-hardware-configuration">3. Hardware Configuration</h1>
-
-<h2 class="mume-header" id="user-input">User Input</h2>
-
-<h3 class="mume-header" id="b1-user-button">B1 User Button</h3>
-
+<h1 id="3-hardware-configuration">3. Hardware Configuration<a class="anchor" href="#3-hardware-configuration" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="user-input">User Input<a class="anchor" href="#user-input" aria-label="Liên kết tới mục này">#</a></h2>
+<h3 id="b1-user-button--navigate-pa0">B1 User Button — Navigate (PA0)<a class="anchor" href="#b1-user-button--navigate-pa0" aria-label="Liên kết tới mục này">#</a></h3>
 <p>GPIO:</p>
 <p>PA0</p>
-<p>Functions:</p>
+<p>Function:</p>
 <p>Short Press:</p>
 <ul>
-<li>Change selection</li>
+<li>Move selection between menu items</li>
 </ul>
-<p>Long Press (3 seconds):</p>
+<p>Note: Long press removed. Confirm/Start is handled by PD2.</p>
+<hr>
+<h3 id="start--confirm-button--pd2-external">Start / Confirm Button — (PD2, external)<a class="anchor" href="#start--confirm-button--pd2-external" aria-label="Liên kết tới mục này">#</a></h3>
+<p>GPIO:</p>
+<p>PD2</p>
+<p>Interface:</p>
+<p>EXTI2, falling edge, internal pull-up (button connects PD2 to GND)</p>
+<p>Function:</p>
+<p>Press:</p>
 <ul>
 <li>Confirm selection</li>
-<li>Start selected mode</li>
+<li>Start selected wash mode</li>
 </ul>
 <hr>
-<h2 class="mume-header" id="oled-display">OLED Display</h2>
-
+<h3 id="door-sensor-simulation-button--pd5-external">Door Sensor Simulation Button — (PD5, external)<a class="anchor" href="#door-sensor-simulation-button--pd5-external" aria-label="Liên kết tới mục này">#</a></h3>
+<p>GPIO:</p>
+<p>PD5</p>
+<p>Interface:</p>
+<p>GPIO Input, pull-up, polled every 100 ms by SensorTask</p>
+<p>Function:</p>
+<p>Toggle Press:</p>
+<ul>
+<li>Odd presses: door OPEN → triggers EVT_ERROR</li>
+<li>Even presses: door CLOSED → normal operation</li>
+<li>Default state at startup: CLOSED</li>
+</ul>
+<hr>
+<h3 id="water-level-sensor-simulation-button--pd6-external">Water Level Sensor Simulation Button — (PD6, external)<a class="anchor" href="#water-level-sensor-simulation-button--pd6-external" aria-label="Liên kết tới mục này">#</a></h3>
+<p>GPIO:</p>
+<p>PD6</p>
+<p>Interface:</p>
+<p>GPIO Input, pull-up, polled every 100 ms by SensorTask</p>
+<p>Function:</p>
+<p>Toggle Press:</p>
+<ul>
+<li>Odd presses: water FULL → machine advances from FILL_WATER to WASHING</li>
+<li>Even presses: water EMPTY (no immediate action)</li>
+<li>Default state at startup: EMPTY</li>
+</ul>
+<hr>
+<h2 id="oled-display">OLED Display<a class="anchor" href="#oled-display" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Interface:</p>
 <p>I2C1</p>
 <p>Recommended Pins:</p>
@@ -342,10 +453,8 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>hi2c1</p>
 <p>when passing the OLED I2C handle to OLED drivers.</p>
 <hr>
-<h2 class="mume-header" id="simulation-outputs">Simulation Outputs</h2>
-
-<h3 class="mume-header" id="motor">Motor</h3>
-
+<h2 id="simulation-outputs">Simulation Outputs<a class="anchor" href="#simulation-outputs" aria-label="Liên kết tới mục này">#</a></h2>
+<h3 id="motor">Motor<a class="anchor" href="#motor" aria-label="Liên kết tới mục này">#</a></h3>
 <p>GPIO:</p>
 <p>PD12</p>
 <p>Board LED:</p>
@@ -354,8 +463,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>HIGH = Motor ON</p>
 <p>LOW = Motor OFF</p>
 <hr>
-<h3 class="mume-header" id="water-inlet-valve">Water Inlet Valve</h3>
-
+<h3 id="water-inlet-valve">Water Inlet Valve<a class="anchor" href="#water-inlet-valve" aria-label="Liên kết tới mục này">#</a></h3>
 <p>GPIO:</p>
 <p>PD13</p>
 <p>Board LED:</p>
@@ -364,8 +472,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>HIGH = Filling Water</p>
 <p>LOW = Stop Filling</p>
 <hr>
-<h3 class="mume-header" id="drain-valve">Drain Valve</h3>
-
+<h3 id="drain-valve">Drain Valve<a class="anchor" href="#drain-valve" aria-label="Liên kết tới mục này">#</a></h3>
 <p>GPIO:</p>
 <p>PD14</p>
 <p>Board LED:</p>
@@ -374,8 +481,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>HIGH = Draining</p>
 <p>LOW = Drain Complete</p>
 <hr>
-<h3 class="mume-header" id="system-status">System Status</h3>
-
+<h3 id="system-status">System Status<a class="anchor" href="#system-status" aria-label="Liên kết tới mục này">#</a></h3>
 <p>GPIO:</p>
 <p>PD15</p>
 <p>Board LED:</p>
@@ -384,50 +490,45 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>HIGH = Machine Running</p>
 <p>LOW = Machine Idle</p>
 <hr>
-<h1 class="mume-header" id="4-washing-modes">4. Washing Modes</h1>
-
-<h2 class="mume-header" id="wash-mode">Wash Mode</h2>
-
+<h1 id="4-washing-modes">4. Washing Modes<a class="anchor" href="#4-washing-modes" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="wash-mode">Wash Mode<a class="anchor" href="#wash-mode" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Flow:</p>
 <p>IDLE</p>
-<p>&#x2192; FILL_WATER</p>
-<p>&#x2192; WASHING</p>
-<p>&#x2192; DRAIN</p>
-<p>&#x2192; SPIN</p>
-<p>&#x2192; FINISH</p>
+<p>→ FILL_WATER</p>
+<p>→ WASHING</p>
+<p>→ DRAIN</p>
+<p>→ SPIN</p>
+<p>→ FINISH</p>
 <hr>
-<h2 class="mume-header" id="spin-mode">Spin Mode</h2>
-
+<h2 id="spin-mode">Spin Mode<a class="anchor" href="#spin-mode" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Flow:</p>
 <p>IDLE</p>
-<p>&#x2192; SPIN</p>
-<p>&#x2192; FINISH</p>
+<p>→ SPIN</p>
+<p>→ FINISH</p>
 <hr>
-<h1 class="mume-header" id="5-user-interface">5. User Interface</h1>
-
+<h1 id="5-user-interface">5. User Interface<a class="anchor" href="#5-user-interface" aria-label="Liên kết tới mục này">#</a></h1>
 <p>OLED Main Screen:</p>
 <p>Washing Machine</p>
 <blockquote>
 <p>Wash</p>
 </blockquote>
 <p>Spin</p>
-<p>Short Press:</p>
+<p>PA0 Short Press:</p>
 <ul>
-<li>Move selection</li>
+<li>Move cursor to next menu item</li>
 </ul>
-<p>OLED:</p>
+<p>OLED after press:</p>
 <p>Washing Machine</p>
 <p>Wash</p>
 <blockquote>
 <p>Spin</p>
 </blockquote>
-<p>Long Press (3 seconds):</p>
+<p>PD2 Press (Start/Confirm):</p>
 <ul>
-<li>Start selected mode</li>
+<li>Start selected mode immediately (no hold required)</li>
 </ul>
 <hr>
-<h1 class="mume-header" id="6-state-machine">6. State Machine</h1>
-
+<h1 id="6-state-machine">6. State Machine<a class="anchor" href="#6-state-machine" aria-label="Liên kết tới mục này">#</a></h1>
 <p>States:</p>
 <ul>
 <li>IDLE</li>
@@ -438,7 +539,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>FINISH</li>
 <li>ERROR</li>
 </ul>
-<div class="mermaid">stateDiagram-v2
+<div class="dg-slot"><figure class="diagram" data-src="stateDiagram-v2
 
     [*] --&gt; IDLE
 
@@ -458,32 +559,110 @@ pre[data-line] .line-highlight[data-end]:after {
     FINISH --&gt; IDLE : User Acknowledge
 
     ERROR --&gt; IDLE : Reset
-</div><hr>
-<h1 class="mume-header" id="7-rtos-architecture">7. RTOS Architecture</h1>
-
-<p>Button ISR</p>
-<p>&#x2193;</p>
-<p>Button Queue</p>
-<p>&#x2193;</p>
-<p>UI Task</p>
-<p>&#x2193;</p>
-<p>Command Queue</p>
-<p>&#x2193;</p>
-<p>WashingManager Task</p>
-<p>&#x2191;</p>
-<p>Event Group</p>
-<p>&#x2191;</p>
-<p>Sensor Task</p>
-<p>WashingManager</p>
-<p>&#x2193;</p>
-<p>Display Queue</p>
-<p>&#x2193;</p>
-<p>OLED Task</p>
+"></figure></div>
 <hr>
-<h1 class="mume-header" id="8-task-design">8. Task Design</h1>
+<h1 id="7-rtos-architecture">7. RTOS Architecture<a class="anchor" href="#7-rtos-architecture" aria-label="Liên kết tới mục này">#</a></h1>
+<p>Bốn task chia sẻ với nhau qua ba queue và một event group. Mọi luồng dữ liệu đều
+<strong>một chiều</strong> và mỗi đối tượng chỉ có <strong>một bên gửi, một bên nhận chính</strong>.</p>
+<div class="dg-slot"><figure class="diagram" data-src="flowchart TB
+    subgraph CMD[&quot;① Luồng lệnh người dùng&quot;]
+        ISR([&quot;&lt;b&gt;Button ISR&lt;/b&gt;&lt;br/&gt;PA0 · PD2&quot;])
+        BQ[(&quot;&lt;b&gt;Button Queue&lt;/b&gt;&quot;)]
+        UI[&quot;&lt;b&gt;UI Task&lt;/b&gt; · Prio 2&lt;br/&gt;menu · tạo lệnh&quot;]
+        CQ[(&quot;&lt;b&gt;Command Queue&lt;/b&gt;&quot;)]
+        ISR --&gt; BQ --&gt; UI --&gt; CQ
+    end
 
-<h2 class="mume-header" id="ui-task">UI Task</h2>
+    subgraph EVT[&quot;② Luồng sự kiện hệ thống&quot;]
+        SNS[&quot;&lt;b&gt;Sensor Task&lt;/b&gt; · Prio 2&lt;br/&gt;mỗi 100 ms: cửa · mực nước&quot;]
+        TMR{{&quot;&lt;b&gt;Software Timers&lt;/b&gt;&lt;br/&gt;hết giờ từng giai đoạn&quot;}}
+        EG[[&quot;&lt;b&gt;Event Group&lt;/b&gt;&lt;br/&gt;DOOR_CLOSED · WATER_FULL&lt;br/&gt;TIMEOUT · FINISHED · ERROR&quot;]]
+        SNS --&gt; EG
+        TMR --&gt; EG
+    end
 
+    WM[&quot;&lt;b&gt;WashingManager Task&lt;/b&gt; · Prio 3&lt;br/&gt;chủ duy nhất của máy trạng thái&lt;br/&gt;điều khiển motor · van · đèn&quot;]
+
+    subgraph DSP[&quot;③ Luồng hiển thị&quot;]
+        DQ[(&quot;&lt;b&gt;Display Queue&lt;/b&gt;&quot;)]
+        OLED[&quot;&lt;b&gt;OLED Task&lt;/b&gt; · Prio 1&lt;br/&gt;chủ duy nhất của OLED&quot;]
+        DQ --&gt; OLED
+    end
+
+    CQ --&gt; WM
+    EG --&gt; WM
+    WM --&gt; DQ
+
+    classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef queue fill:#e3f6e8,stroke:#2f9e44,stroke-width:2px,color:#1f2328
+    classDef event fill:#f1e6ff,stroke:#9333ea,stroke-width:2px,color:#1f2328
+    classDef timer fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    class ISR isr
+    class UI,SNS,OLED task
+    class BQ,CQ,DQ queue
+    class EG event
+    class TMR timer
+    class WM hub
+
+    style CMD fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+    style EVT fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+    style DSP fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+"></figure></div>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Ký hiệu</th>
+<th>Loại</th>
+<th>Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🟠 bầu dục</td>
+<td><strong>ISR</strong></td>
+<td>Chạy trong ngắt, chỉ ghi vào queue rồi thoát</td>
+</tr>
+<tr>
+<td>🔵 hộp chữ nhật</td>
+<td><strong>Task</strong></td>
+<td>Vòng lặp vô hạn, phần lớn thời gian ở trạng thái Blocked</td>
+</tr>
+<tr>
+<td>🟢 hình trụ</td>
+<td><strong>Queue</strong></td>
+<td>Chuyển dữ liệu theo thứ tự (FIFO), sao chép theo giá trị</td>
+</tr>
+<tr>
+<td>🟣 hộp đôi</td>
+<td><strong>Event Group</strong></td>
+<td>Bộ cờ trạng thái dùng chung, task chờ tổ hợp bit</td>
+</tr>
+<tr>
+<td>⚪ lục giác</td>
+<td><strong>Software Timer</strong></td>
+<td>Đếm giờ, hết giờ thì set bit <code>EVT_TIMEOUT</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Cách đọc:</strong></p>
+<ol>
+<li><strong>Luồng lệnh</strong> — nút bấm tạo ngắt; ISR đẩy sự kiện vào Button Queue; UI Task
+diễn giải theo vị trí con trỏ menu rồi gửi lệnh Start qua Command Queue.</li>
+<li><strong>Luồng sự kiện</strong> — Sensor Task (định kỳ) và các Software Timer (khi hết giờ)
+set bit vào Event Group; WashingManager chờ đúng những bit có nghĩa ở trạng
+thái hiện tại.</li>
+<li><strong>Luồng hiển thị</strong> — WashingManager gửi nội dung cần vẽ vào Display Queue;
+OLED Task là task duy nhất được chạm vào OLED.</li>
+</ol>
+<blockquote>
+<p><strong>Mutex</strong> (bảo vệ OLED, UART debug) là mở rộng dự kiến — xem mục 9, chưa nằm
+trong sơ đồ này.</p>
+</blockquote>
+<hr>
+<h1 id="8-task-design">8. Task Design<a class="anchor" href="#8-task-design" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="ui-task">UI Task<a class="anchor" href="#ui-task" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Responsibilities:</p>
 <ul>
 <li>Process button events</li>
@@ -494,8 +673,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Priority:</p>
 <p>2</p>
 <hr>
-<h2 class="mume-header" id="washingmanager-task">WashingManager Task</h2>
-
+<h2 id="washingmanager-task">WashingManager Task<a class="anchor" href="#washingmanager-task" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Responsibilities:</p>
 <ul>
 <li>State machine execution</li>
@@ -508,8 +686,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Notes:</p>
 <p>WashingManager is the owner of all machine states.</p>
 <hr>
-<h2 class="mume-header" id="sensor-task">Sensor Task</h2>
-
+<h2 id="sensor-task">Sensor Task<a class="anchor" href="#sensor-task" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Responsibilities:</p>
 <ul>
 <li>Monitor door sensor</li>
@@ -521,8 +698,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Period:</p>
 <p>100 ms</p>
 <hr>
-<h2 class="mume-header" id="oled-task">OLED Task</h2>
-
+<h2 id="oled-task">OLED Task<a class="anchor" href="#oled-task" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Responsibilities:</p>
 <ul>
 <li>OLED rendering</li>
@@ -533,12 +709,9 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Notes:</p>
 <p>OLEDTask is the only task allowed to access the OLED driver.</p>
 <hr>
-<h1 class="mume-header" id="9-rtos-objects">9. RTOS Objects</h1>
-
-<h2 class="mume-header" id="queues">Queues</h2>
-
-<h3 class="mume-header" id="button-queue">Button Queue</h3>
-
+<h1 id="9-rtos-objects">9. RTOS Objects<a class="anchor" href="#9-rtos-objects" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="queues">Queues<a class="anchor" href="#queues" aria-label="Liên kết tới mục này">#</a></h2>
+<h3 id="button-queue">Button Queue<a class="anchor" href="#button-queue" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Producer:</p>
 <p>Button ISR</p>
 <p>Consumer:</p>
@@ -546,8 +719,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Purpose:</p>
 <p>Transfer button events from ISR to task context.</p>
 <hr>
-<h3 class="mume-header" id="command-queue">Command Queue</h3>
-
+<h3 id="command-queue">Command Queue<a class="anchor" href="#command-queue" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Producer:</p>
 <p>UI Task</p>
 <p>Consumer:</p>
@@ -555,8 +727,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Purpose:</p>
 <p>Transfer user commands.</p>
 <hr>
-<h3 class="mume-header" id="display-queue">Display Queue</h3>
-
+<h3 id="display-queue">Display Queue<a class="anchor" href="#display-queue" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Producer:</p>
 <p>WashingManager Task</p>
 <p>Consumer:</p>
@@ -564,8 +735,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Purpose:</p>
 <p>Transfer display updates.</p>
 <hr>
-<h2 class="mume-header" id="event-group">Event Group</h2>
-
+<h2 id="event-group">Event Group<a class="anchor" href="#event-group" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Event Bits:</p>
 <p>EVT_DOOR_CLOSED</p>
 <p>EVT_WATER_FULL</p>
@@ -575,8 +745,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Purpose:</p>
 <p>System synchronization.</p>
 <hr>
-<h2 class="mume-header" id="software-timers">Software Timers</h2>
-
+<h2 id="software-timers">Software Timers<a class="anchor" href="#software-timers" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Wash Timer</p>
 <p>Purpose:</p>
 <p>Control washing duration.</p>
@@ -584,8 +753,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Purpose:</p>
 <p>Control spinning duration.</p>
 <hr>
-<h2 class="mume-header" id="mutex">Mutex</h2>
-
+<h2 id="mutex">Mutex<a class="anchor" href="#mutex" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Future Usage:</p>
 <ul>
 <li>OLED protection</li>
@@ -593,8 +761,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>Shared resource protection</li>
 </ul>
 <hr>
-<h1 class="mume-header" id="10-simulation-timing">10. Simulation Timing</h1>
-
+<h1 id="10-simulation-timing">10. Simulation Timing<a class="anchor" href="#10-simulation-timing" aria-label="Liên kết tới mục này">#</a></h1>
 <p>Fill Water:</p>
 <p>10 seconds</p>
 <p>Wash:</p>
@@ -605,24 +772,21 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>10 seconds</p>
 <p>These values are configurable and may be adjusted during development.</p>
 <hr>
-<h1 class="mume-header" id="11-hardware-verification">11. Hardware Verification</h1>
-
+<h1 id="11-hardware-verification">11. Hardware Verification<a class="anchor" href="#11-hardware-verification" aria-label="Liên kết tới mục này">#</a></h1>
 <p>The project shall be verifiable using:</p>
 <ul>
 <li>On-board LEDs</li>
 <li>Logic Analyzer</li>
 <li>SEGGER SystemView</li>
 </ul>
-<h2 class="mume-header" id="logic-analyzer-connections">Logic Analyzer Connections</h2>
-
+<h2 id="logic-analyzer-connections">Logic Analyzer Connections<a class="anchor" href="#logic-analyzer-connections" aria-label="Liên kết tới mục này">#</a></h2>
 <p>CH0 -&gt; PD12 (Motor)</p>
 <p>CH1 -&gt; PD13 (Inlet Valve)</p>
 <p>CH2 -&gt; PD14 (Drain Valve)</p>
 <p>CH3 -&gt; PD15 (System Status)</p>
 <p>GND -&gt; Board GND</p>
 <hr>
-<h2 class="mume-header" id="expected-wash-sequence">Expected Wash Sequence</h2>
-
+<h2 id="expected-wash-sequence">Expected Wash Sequence<a class="anchor" href="#expected-wash-sequence" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Step 1</p>
 <p>PD13 HIGH</p>
 <p>Duration:</p>
@@ -658,8 +822,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Meaning:</p>
 <p>Finished</p>
 <hr>
-<h2 class="mume-header" id="expected-spin-sequence">Expected Spin Sequence</h2>
-
+<h2 id="expected-spin-sequence">Expected Spin Sequence<a class="anchor" href="#expected-spin-sequence" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Step 1</p>
 <p>PD12 HIGH</p>
 <p>Duration:</p>
@@ -672,24 +835,20 @@ pre[data-line] .line-highlight[data-end]:after {
 <p>Meaning:</p>
 <p>Finished</p>
 <hr>
-<h1 class="mume-header" id="12-error-handling">12. Error Handling</h1>
-
-<h2 class="mume-header" id="door-open">Door Open</h2>
-
+<h1 id="12-error-handling">12. Error Handling<a class="anchor" href="#12-error-handling" aria-label="Liên kết tới mục này">#</a></h1>
+<h2 id="door-open">Door Open<a class="anchor" href="#door-open" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Condition:</p>
 <p>Door opened while machine is running.</p>
 <p>Action:</p>
 <p>Transition to ERROR state.</p>
 <hr>
-<h2 class="mume-header" id="water-fill-timeout">Water Fill Timeout</h2>
-
+<h2 id="water-fill-timeout">Water Fill Timeout<a class="anchor" href="#water-fill-timeout" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Condition:</p>
 <p>Water level not detected within allowed time.</p>
 <p>Action:</p>
 <p>Transition to ERROR state.</p>
 <hr>
-<h1 class="mume-header" id="13-design-rules">13. Design Rules</h1>
-
+<h1 id="13-design-rules">13. Design Rules<a class="anchor" href="#13-design-rules" aria-label="Liên kết tới mục này">#</a></h1>
 <ol>
 <li>WashingManager owns all system states.</li>
 <li>OLEDTask owns all OLED access.</li>
@@ -703,8 +862,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>Explain FreeRTOS APIs before introducing them.</li>
 </ol>
 <hr>
-<h1 class="mume-header" id="14-future-extensions">14. Future Extensions</h1>
-
+<h1 id="14-future-extensions">14. Future Extensions<a class="anchor" href="#14-future-extensions" aria-label="Liên kết tới mục này">#</a></h1>
 <ul>
 <li>UART Debug Task</li>
 <li>Logging System</li>
@@ -717,8 +875,7 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>SD Card Logging</li>
 </ul>
 <hr>
-<h1 class="mume-header" id="15-development-roadmap">15. Development Roadmap</h1>
-
+<h1 id="15-development-roadmap">15. Development Roadmap<a class="anchor" href="#15-development-roadmap" aria-label="Liên kết tới mục này">#</a></h1>
 <p>Phase 1</p>
 <ul>
 <li>Project Setup</li>
@@ -764,49 +921,405 @@ pre[data-line] .line-highlight[data-end]:after {
 <li>Advanced Features</li>
 </ul>
 
-      </div>
-      
-      
-    
-    
-    <script>
-// config mermaid init call
-// http://knsv.github.io/mermaid/#configuration
-//
-// You can edit the 'MERMAID_CONFIG' variable below.
-MERMAID_CONFIG = {
-  startOnLoad: false
-}
+    <footer class="doc-footer">
+      Sinh tự động từ <code>PROJECT_SPEC.md</code>. Sửa file <code>.md</code> rồi chạy
+      <code>npm run build</code> trong <code>tools/</code> — đừng sửa tay file này.
+    </footer>
+  </main>
+</div>
+<script>
+/* ==========================================================================
+   Doc viewer script — inlined into every generated page by build_docs.mjs.
+   Responsibilities: theme toggle, TOC highlighting, Mermaid rendering and the
+   zoom / pan / fullscreen controls around each diagram.
+   ========================================================================== */
+(function () {
+  'use strict';
 
-if (window['MERMAID_CONFIG']) {
-  window['MERMAID_CONFIG'].startOnLoad = false
-  window['MERMAID_CONFIG'].cloneCssStyles = false
-  window['MERMAID_CONFIG'].theme = "default"
-}
-mermaid.initialize(window['MERMAID_CONFIG'] || {})
-if (typeof(window['Reveal']) !== 'undefined') {
-  function mermaidRevealHelper(event) {
-    var currentSlide = event.currentSlide
-    var diagrams = currentSlide.querySelectorAll('.mermaid')
-    for (var i = 0; i < diagrams.length; i++) {
-      var diagram = diagrams[i]
-      if (!diagram.hasAttribute('data-processed')) {
-        mermaid.init(null, diagram, ()=> {
-          Reveal.slide(event.indexh, event.indexv)
-        })
+  var MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.esm.min.mjs';
+  var MAX_ZOOM = 8;
+  var MIN_ZOOM = 0.1;
+  var STEP = 1.25;
+
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function isDark() { return document.documentElement.dataset.theme === 'dark'; }
+
+  /* ------------------------------------------------------------------------
+     Theme
+     ------------------------------------------------------------------------ */
+  var themeListeners = [];
+  $('.theme-toggle').addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('doc-theme', next); } catch (e) { /* private mode */ }
+    themeListeners.forEach(function (fn) { fn(); });
+  });
+
+  /* ------------------------------------------------------------------------
+     TOC: mobile toggle + highlight the section being read
+     ------------------------------------------------------------------------ */
+  var tocBtn = $('.toc-toggle');
+  if (tocBtn) {
+    tocBtn.addEventListener('click', function () { document.body.classList.toggle('toc-open'); });
+  }
+  $$('.toc a').forEach(function (a) {
+    a.addEventListener('click', function () { document.body.classList.remove('toc-open'); });
+  });
+
+  (function initToc() {
+    var links = {};
+    $$('.toc a[data-id]').forEach(function (a) { links[a.dataset.id] = a; });
+    var heads = $$('.content h1[id], .content h2[id]').filter(function (h) { return links[h.id]; });
+    if (!heads.length || !('IntersectionObserver' in window)) return;
+
+    var current = null;
+    function setActive(id) {
+      if (current === id) return;
+      current = id;
+      $$('.toc a.active').forEach(function (a) { a.classList.remove('active'); });
+      $$('.toc li.grp.open').forEach(function (li) { li.classList.remove('open'); });
+      var a = links[id];
+      a.classList.add('active');
+      var grp = a.closest('li.grp');
+      if (grp) grp.classList.add('open');
+      var nav = $('.toc');
+      var top = a.offsetTop, bottom = top + a.offsetHeight;
+      if (top < nav.scrollTop + 40 || bottom > nav.scrollTop + nav.clientHeight - 40) {
+        nav.scrollTop = Math.max(0, top - nav.clientHeight / 3);
+      }
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) setActive(e.target.id); });
+    }, { rootMargin: '-8% 0px -85% 0px' });
+    heads.forEach(function (h) { io.observe(h); });
+    setActive(heads[0].id);
+  })();
+
+  /* ------------------------------------------------------------------------
+     Diagram: zoom / pan / fullscreen around one rendered <svg>
+     ------------------------------------------------------------------------ */
+  function Diagram(fig) {
+    var self = this;
+    var slot = fig.parentElement;
+    var view = $('.dg-view', fig);
+    var stage = $('.dg-stage', fig);
+    var zoomOut = $('.dg-zoom', fig);
+    var S = { k: 1, x: 0, y: 0, w: 0, h: 0, mode: 'width' }; // mode: width | fit | free
+
+    function isFull() { return fig.classList.contains('is-full'); }
+
+    function apply() {
+      stage.style.transform = 'translate(' + S.x + 'px,' + S.y + 'px) scale(' + S.k + ')';
+      zoomOut.textContent = Math.round(S.k * 100) + '%';
+    }
+
+    function limitPan() {
+      // Never let the diagram be dragged completely out of view.
+      var vw = view.clientWidth, vh = view.clientHeight, keep = 48;
+      S.x = clamp(S.x, keep - S.w * S.k, vw - keep);
+      S.y = clamp(S.y, keep - S.h * S.k, vh - keep);
+    }
+
+    function setViewHeight(px) {
+      if (isFull()) return;
+      var h = Math.round(clamp(px, 200, window.innerHeight * 0.82));
+      if (view.style.height !== h + 'px') view.style.height = h + 'px';
+    }
+
+    function fitWidth() {
+      var vw = view.clientWidth;
+      var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
+      setViewHeight(S.h * S.k + 24);
+      var vh = view.clientHeight;
+      S.x = (vw - S.w * S.k) / 2;
+      S.y = S.h * S.k + 24 <= vh ? (vh - S.h * S.k) / 2 : 12;
+    }
+
+    function fitAll() {
+      if (!isFull()) setViewHeight(window.innerHeight * 0.7);
+      var vw = view.clientWidth, vh = view.clientHeight;
+      var k = Math.min((vw - 24) / S.w, (vh - 24) / S.h, isFull() ? 1.6 : 1);
+      S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
+      S.x = (vw - S.w * S.k) / 2;
+      S.y = (vh - S.h * S.k) / 2;
+    }
+
+    function refit() {
+      if (!S.w || S.mode === 'free') return;
+      if (S.mode === 'width') fitWidth(); else fitAll();
+      apply();
+    }
+
+    function setMode(mode) { S.mode = mode; refit(); }
+
+    function zoomAt(clientX, clientY, factor) {
+      var rect = view.getBoundingClientRect();
+      var px = clientX - rect.left, py = clientY - rect.top;
+      var nk = clamp(S.k * factor, MIN_ZOOM, MAX_ZOOM);
+      var f = nk / S.k;
+      S.x = px - (px - S.x) * f;
+      S.y = py - (py - S.y) * f;
+      S.k = nk;
+      S.mode = 'free';
+      limitPan();
+      apply();
+    }
+
+    function zoomCenter(factor) {
+      var r = view.getBoundingClientRect();
+      zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+    }
+
+    function actualSize() {
+      var r = view.getBoundingClientRect();
+      zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1 / S.k);
+    }
+
+    function panBy(dx, dy) {
+      S.x += dx; S.y += dy; S.mode = 'free';
+      limitPan(); apply();
+    }
+
+    function setFull(on) {
+      if (on === isFull()) return;
+      if (on) slot.style.height = fig.offsetHeight + 'px';   // keep page layout from jumping
+      fig.classList.toggle('is-full', on);
+      if (!on) slot.style.height = '';
+      document.documentElement.classList.toggle('dg-lock', !!$('.diagram.is-full'));
+      $('[data-act="full"]', fig).textContent = on ? '✕' : '⤢';
+      $('[data-act="full"]', fig).title = on ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình (F)';
+      S.mode = on ? 'fit' : 'width';
+      requestAnimationFrame(function () { refit(); view.focus({ preventScroll: true }); });
+    }
+
+    /* --- content --- */
+    this.setSvg = function (markup) {
+      stage.innerHTML = markup;
+      var svg = $('svg', stage);
+      if (!svg) return false;
+      var vb = svg.viewBox && svg.viewBox.baseVal;
+      var w = vb && vb.width, h = vb && vb.height;
+      if (!w || !h) {
+        var bb = svg.getBBox();
+        w = bb.width; h = bb.height;
+      }
+      S.w = Math.ceil(w); S.h = Math.ceil(h);
+      svg.setAttribute('width', S.w);
+      svg.setAttribute('height', S.h);
+      svg.style.maxWidth = 'none';
+      stage.style.width = S.w + 'px';
+      stage.style.height = S.h + 'px';
+      S.mode = isFull() ? 'fit' : 'width';
+      refit();
+      return true;
+    };
+    this.setFull = setFull;
+    this.showMessage = function (html) {
+      S.w = 0;
+      stage.style.cssText = '';
+      stage.style.transform = 'none';
+      stage.innerHTML = '<div class="dg-msg">' + html + '</div>';
+    };
+
+    /* --- buttons --- */
+    fig.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      switch (b.dataset.act) {
+        case 'in':   zoomCenter(STEP); break;
+        case 'out':  zoomCenter(1 / STEP); break;
+        case 'one':  actualSize(); break;
+        case 'width': setMode('width'); break;
+        case 'fit':  setMode('fit'); break;
+        case 'full': setFull(!isFull()); break;
+      }
+    });
+
+    /* --- wheel: Ctrl/⌘ + wheel (or pinch) inline; plain wheel in fullscreen --- */
+    view.addEventListener('wheel', function (e) {
+      if (!(isFull() || e.ctrlKey || e.metaKey) || !S.w) return;
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      var sens = (e.ctrlKey && Math.abs(dy) < 50) ? 0.01 : 0.0015;   // trackpad pinch vs mouse wheel
+      zoomAt(e.clientX, e.clientY, Math.exp(-dy * sens));
+    }, { passive: false });
+
+    /* --- drag to pan, two fingers to pinch --- */
+    var ptrs = new Map();
+    var pinch = null;
+    function pinchState() {
+      var p = Array.from(ptrs.values());
+      return {
+        d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1,
+        cx: (p[0].x + p[1].x) / 2, cy: (p[0].y + p[1].y) / 2
+      };
+    }
+    view.addEventListener('pointerdown', function (e) {
+      if (!S.w || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      view.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      view.classList.add('grabbing');
+      pinch = ptrs.size === 2 ? pinchState() : null;
+    });
+    view.addEventListener('pointermove', function (e) {
+      var p = ptrs.get(e.pointerId);
+      if (!p) return;
+      if (ptrs.size === 1) {
+        panBy(e.clientX - p.x, e.clientY - p.y);
+        p.x = e.clientX; p.y = e.clientY;
+      } else if (ptrs.size === 2 && pinch) {
+        p.x = e.clientX; p.y = e.clientY;
+        var now = pinchState();
+        panBy(now.cx - pinch.cx, now.cy - pinch.cy);
+        zoomAt(now.cx, now.cy, now.d / pinch.d);
+        pinch = now;
+      }
+    });
+    function endPointer(e) {
+      ptrs.delete(e.pointerId);
+      pinch = null;
+      if (!ptrs.size) view.classList.remove('grabbing');
+    }
+    view.addEventListener('pointerup', endPointer);
+    view.addEventListener('pointercancel', endPointer);
+
+    view.addEventListener('dblclick', function (e) {
+      if (!S.w) return;
+      zoomAt(e.clientX, e.clientY, e.shiftKey ? 1 / 1.8 : 1.8);
+    });
+
+    /* --- keyboard (when the viewport has focus) --- */
+    view.addEventListener('keydown', function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var handled = true;
+      switch (e.key) {
+        case '+': case '=': zoomCenter(STEP); break;
+        case '-': case '_': zoomCenter(1 / STEP); break;
+        case '0': setMode('fit'); break;
+        case '1': actualSize(); break;
+        case 'w': case 'W': setMode('width'); break;
+        case 'f': case 'F': setFull(!isFull()); break;
+        case 'ArrowLeft':  panBy(80, 0); break;
+        case 'ArrowRight': panBy(-80, 0); break;
+        case 'ArrowUp':    panBy(0, 80); break;
+        case 'ArrowDown':  panBy(0, -80); break;
+        default: handled = false;
+      }
+      if (handled) e.preventDefault();
+    });
+
+    /* --- keep fitted diagrams fitted when the box resizes --- */
+    if ('ResizeObserver' in window) {
+      var raf = 0;
+      new ResizeObserver(function () {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(refit);
+      }).observe(view);
+    }
+
+    fig._dg = self;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var f = $('.diagram.is-full');
+    if (f && f._dg) f._dg.setFull(false);
+  });
+
+  /* ------------------------------------------------------------------------
+     Build every diagram frame, then render Mermaid into it
+     ------------------------------------------------------------------------ */
+  function titleFor(fig) {
+    var el = fig.parentElement;
+    while ((el = el.previousElementSibling)) {
+      if (/^H[1-6]$/.test(el.tagName)) {
+        var clone = el.cloneNode(true);
+        var a = $('.anchor', clone);
+        if (a) a.remove();
+        return clone.textContent.trim();
+      }
+    }
+    return 'Sơ đồ';
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+
+  var figs = $$('figure.diagram');
+  figs.forEach(function (fig) {
+    var title = escapeHtml(titleFor(fig));
+    fig.insertAdjacentHTML('afterbegin',
+      '<div class="dg-bar">' +
+        '<span class="dg-title" title="' + title + '">' + title + '</span>' +
+        '<span class="dg-hint">Kéo để di chuyển · Ctrl + cuộn để zoom · nhấp đúp để phóng to</span>' +
+        '<span class="dg-btns">' +
+          '<button type="button" data-act="out" title="Thu nhỏ (−)" aria-label="Thu nhỏ">−</button>' +
+          '<span class="dg-zoom" aria-live="polite">100%</span>' +
+          '<button type="button" data-act="in" title="Phóng to (+)" aria-label="Phóng to">+</button>' +
+          '<button type="button" data-act="one" title="Kích thước thật (1)">1:1</button>' +
+          '<button type="button" data-act="width" title="Vừa chiều rộng (W)">Vừa rộng</button>' +
+          '<button type="button" data-act="fit" title="Thấy toàn bộ sơ đồ (0)">Vừa khung</button>' +
+          '<button type="button" data-act="full" title="Toàn màn hình (F)" aria-label="Toàn màn hình">⤢</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="dg-view" tabindex="0" role="img" aria-label="' + title + '">' +
+        '<div class="dg-stage"><div class="dg-msg">Đang vẽ sơ đồ…</div></div>' +
+      '</div>');
+    new Diagram(fig);
+  });
+
+  if (!figs.length) return;
+
+  var mermaid = null;
+  var renderSeq = 0;
+
+  function mermaidConfig() {
+    return {
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: isDark() ? 'dark' : 'default',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      flowchart: { useMaxWidth: false },
+      sequence: { useMaxWidth: false },
+      state: { useMaxWidth: false },
+      class: { useMaxWidth: false }
+    };
+  }
+
+  function showSource(fig, reason) {
+    fig._dg.showMessage(
+      '<div class="dg-err"><strong>Không vẽ được sơ đồ.</strong> ' + escapeHtml(reason) +
+      '<pre>' + escapeHtml(fig.dataset.src) + '</pre></div>');
+  }
+
+  async function renderAll() {
+    mermaid.initialize(mermaidConfig());
+    for (var i = 0; i < figs.length; i++) {
+      var fig = figs[i];
+      try {
+        var out = await mermaid.render('dg-svg-' + (++renderSeq), fig.dataset.src);
+        if (!fig._dg.setSvg(out.svg)) showSource(fig, 'Mermaid không trả về SVG.');
+      } catch (err) {
+        showSource(fig, String((err && err.message) || err));
       }
     }
   }
-  Reveal.addEventListener('slidechanged', mermaidRevealHelper)
-  Reveal.addEventListener('ready', mermaidRevealHelper)
-} else {
-  mermaid.init(null, document.querySelectorAll('.mermaid'))
-}
+
+  import(MERMAID_URL).then(function (mod) {
+    mermaid = mod.default;
+    themeListeners.push(renderAll);
+    return renderAll();
+  }).catch(function () {
+    figs.forEach(function (fig) {
+      showSource(fig, 'Cần internet để tải thư viện Mermaid (' + MERMAID_URL + ').');
+    });
+  });
+})();
+
 </script>
-    
-    
-    
-    
-    
-  
-    </body></html>
+</body>
+</html>

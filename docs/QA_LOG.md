@@ -5,6 +5,373 @@ Cập nhật sau mỗi phiên Q&A trước khi bắt đầu viết code.
 
 ---
 
+## Session 15 — 2026-10-09 — Thiết kế lại HTML: sơ đồ zoom được
+
+**Chủ đề:** Sơ đồ kiến trúc trong `SYSTEM_DIAGRAMS.html` bị co cho vừa chiều rộng
+trang nên chữ không đọc được và không phóng to được. Dựng lại toàn bộ bộ HTML.
+
+---
+
+### Q1: Vì sao không zoom được, và nên sửa ở đâu?
+
+**Chẩn đoán:** Mermaid mặc định đặt `useMaxWidth: true` — tự co SVG cho vừa khung
+chứa nó. Sơ đồ kiến trúc tổng thể thực chất rộng **2757 × 2157 px**; nhét vào cột
+960 px thì còn ~35 %, chữ ~5 px. Trình duyệt không zoom riêng từng sơ đồ được,
+và Ctrl + cuộn zoom cả trang (làm vỡ bố cục chứ không giúp đọc sơ đồ).
+
+**Hai phát hiện kèm theo khi khảo sát 3 file HTML:**
+
+| File | Vấn đề |
+| --- | --- |
+| `PROJECT_SPEC.html` | Nạp `mermaid.min.js` và `katex.css` từ `file:///c:\Users\Dell\.vscode\extensions\...` — chỉ mở được trên đúng máy này, và gãy khi extension đổi phiên bản |
+| `SYSTEM_DIAGRAMS.html` | Viết tay, ghi chú "regenerate when diagrams change" nhưng không có công cụ nào để regenerate → sẽ lệch khỏi `.md` |
+| `START_HERE.html` | Xuất từ Markdown Preview Enhanced; cũ hơn `.md` 16 phút ở phiên trước |
+
+Cả ba do ba cách khác nhau tạo ra. Đây lại là vấn đề "một sự thật nằm ở hai chỗ".
+
+**Quyết định:** một script sinh cả ba từ `.md`, chạy lại là đồng bộ.
+
+---
+
+### Thiết kế
+
+**Công cụ** (`tools/`): `build_docs.mjs` + `template.html` + `viewer.css` +
+`viewer.js`. Phụ thuộc: `markdown-it` (render), `highlight.js` (tô màu C/bash).
+Mermaid vẫn nạp từ CDN, **ghim phiên bản 10.9.8** (trước đó `@10` trôi theo bản mới).
+Không dùng timestamp trong output → build lại khi `.md` không đổi thì **không sinh
+git diff** (đã kiểm chứng bằng sha1).
+
+**Bộ điều khiển sơ đồ:**
+
+| Thao tác | Cách làm |
+| --- | --- |
+| Di chuyển | Kéo chuột |
+| Zoom tại con trỏ | **Ctrl + cuộn** (hoặc pinch trackpad); trong toàn màn hình thì cuộn thường |
+| Phóng nhanh | Nhấp đúp (Shift + nhấp đúp để thu) |
+| Nút | `−`  `+`  `1:1`  `Vừa rộng`  `Vừa khung`  `⤢` |
+| Phím (khi khung có focus) | `+ −` zoom · `0` vừa khung · `1` 100 % · `W` vừa rộng · `F` toàn màn hình · mũi tên di chuyển · `Esc` thoát |
+
+**Quyết định thiết kế đáng ghi lại:**
+
+1. **Inline chỉ zoom bằng Ctrl + cuộn, không phải cuộn thường.** Nếu cuộn thường
+   cũng zoom thì sơ đồ "nuốt" thao tác cuộn trang — người đọc rê chuột qua sơ đồ
+   là bị kẹt. Chỉ trong toàn màn hình (không còn trang để cuộn) mới cho cuộn thường
+   = zoom. Đã kiểm chứng: cuộn thường trên sơ đồ làm `scrollY` tăng, zoom đứng yên.
+2. **Mặc định "vừa chiều rộng", không phải "vừa khung".** Sơ đồ cao như sequence
+   diagram mà ép vừa khung sẽ co rất nhỏ; vừa chiều rộng đọc được ngay và kéo dọc
+   là xem tiếp. "Vừa khung" vẫn có nút riêng cho ai muốn nhìn toàn cảnh.
+3. **Giữ kích thước gốc của SVG** (`useMaxWidth: false`) và scale bằng CSS
+   `transform` → chữ vector, zoom 800 % vẫn sắc nét, không bị vỡ như ảnh bitmap.
+4. **Cảm ứng:** trong trang, cảm ứng vẫn cuộn trang bình thường
+   (`touch-action: pan-x pan-y`); pinch/kéo chỉ bật trong toàn màn hình. Nếu bật
+   luôn thì ngón tay chạm vào sơ đồ là không cuộn trang được.
+5. **Mất mạng không vỡ trang:** nếu không tải được Mermaid, mỗi khung hiện thông
+   báo và **mã nguồn sơ đồ dạng text** thay vì để trống.
+6. Đổi giao diện sáng/tối **vẽ lại** sơ đồ với theme tương ứng (Mermaid cố định
+   màu lúc vẽ, đổi CSS thôi là không đủ).
+
+**Thêm cho cả 3 trang:** mục lục bên trái (tự mở chương đang đọc), tô màu cú pháp C,
+bảng rộng cuộn ngang, neo `#` ở mỗi tiêu đề, link `.md` → `.html` khi đích cũng
+được build, thanh chuyển giữa các tài liệu.
+
+---
+
+### Kiểm chứng: điều khiển Chrome thật, không chỉ "build xong"
+
+Dùng `puppeteer-core` + Chrome (cài ở thư mục tạm, **không** thêm vào project).
+**25/25 kiểm tra đạt**: 9/9 sơ đồ vẽ ra SVG · giữ kích thước gốc (2757 × 2157) ·
+nút `+` / `1:1` · Ctrl + cuộn zoom · cuộn thường **không** zoom · kéo chuột dịch
+đúng 120 × 60 px · nhấp đúp · toàn màn hình phủ đủ 1400 × 900 · cuộn zoom trong
+toàn màn hình · Esc thoát · đổi sang tối vẽ lại đủ 9 sơ đồ · mục lục tô đúng chương
+· không lỗi JS · `PROJECT_SPEC.html` không còn đường dẫn extension.
+Tĩnh: **0** liên kết `#` gãy (215 liên kết), **0** placeholder sót.
+
+**Bài học từ chính quá trình test:** lần chạy đầu có 2 FAIL, và **cả hai đều do
+bài test sai, không phải trang sai** — nhưng không thể biết điều đó nếu không tách
+ra điều tra:
+
+- *Nhấp đúp:* Puppeteer luôn gửi `clickCount: 1` nên trình duyệt không sinh
+  `dblclick`. Gửi sự kiện giả `dblclick` → zoom đúng ×1.8 (0.367 → 0.661); gửi
+  chuỗi `clickCount` 1 rồi 2 như chuột thật → cũng đúng. Kết luận: trang đúng.
+- *Mục lục:* `scroll-behavior: smooth` khiến test đọc trạng thái giữa chừng lúc cuộn.
+
+Quy tắc rút ra: **test fail chưa phải bug — phải cô lập xem lỗi ở đối tượng được
+test hay ở công cụ test, trước khi sửa bất cứ thứ gì.**
+
+---
+
+### Còn tồn tại: bản thân sơ đồ kiến trúc quá lớn
+
+Zoom giải quyết việc đọc, nhưng **sơ đồ tổng thể rộng 2757 × 2157 px là dấu hiệu
+sơ đồ làm quá nhiều việc**: 4 task + 3 queue + 1 event group + 4 timer + 4 GPIO +
+2 ISR trong một hình, với rất nhiều đường chéo nhau. Ngay cả toàn màn hình vẫn chỉ
+vừa ở ~38 %. Hướng cải thiện (chưa làm, chờ quyết định): tách thành 3 sơ đồ —
+luồng nút bấm / luồng cảm biến + event group / luồng timer — mỗi cái dưới ~1200 px.
+
+---
+
+## Session 14 — 2026-08-31 — Viết Tầng 3 & phát hiện bug `s_statusCache`
+
+**Chủ đề:** Viết Tầng 3 (Queue) của `START_HERE.md`. Trong lúc đọc `ui_task.c`
+để trích code, phát hiện một lỗi thiết kế kênh liên lạc có triệu chứng nhìn thấy
+được trên màn hình.
+
+---
+
+### Q1: "ổn rồi viết tiếp tầng 2" — nhưng Tầng 2 đã viết xong
+
+**Nguyên nhân hiểu nhầm:** bạn đang đọc `docs/START_HERE.html` — bản xuất bằng
+Markdown Preview Enhanced lúc **22:03**, trong khi Tầng 2 được ghi vào `.md` lúc
+**22:19**. HTML cũ hơn 16 phút nên vẫn hiện "Tầng 2–6 — 🚧 Chưa viết".
+
+**Rút ra cho quy trình:** `START_HERE.html` là **file dẫn xuất**, không tự cập
+nhật. Mỗi lần sửa `.md` phải xuất lại (chuột phải → Markdown Preview Enhanced →
+Export → HTML), nếu không sẽ đọc nhầm bản cũ. Đây đúng là vấn đề "một sự thật
+nằm ở hai chỗ" mà §0.1 của chính tài liệu đó cảnh báo — lần này áp vào chính bộ
+tài liệu.
+
+---
+
+### Q2: Bug phát hiện khi viết Tầng 3 — `s_statusCache` không bao giờ được ghi
+
+**Triệu chứng:** đang giặt, bấm PA0 để di chuyển con trỏ menu → dòng trạng thái
+OLED đổi từ `WASHING` thành `IDLE`, dù máy vẫn đang giặt (đèn LED vẫn đúng).
+
+**Truy nguyên:**
+
+```c
+/* ui_task.c:44-46 */
+/* Cached status text from last WashingManager display update.
+ * UITask piggybacks this when it sends its own cursor-update messages. */
+static char s_statusCache[24] = "IDLE";
+```
+
+Grep cả file: `s_statusCache` xuất hiện **đúng hai lần** — dòng khai báo và dòng
+đọc (`ui_task.c:65`). **Không có dòng nào ghi vào nó.** Comment mô tả một cơ chế
+cache không tồn tại, và cũng **không thể tồn tại**: `xDisplayQueue` là kênh một
+chiều `WashingManager → OLEDTask`, UITask không đọc nó nên không có đường nào
+biết được statusText hiện tại.
+
+**Chẩn đoán — đây là lỗi thiết kế kênh, không phải lỗi đánh máy:**
+
+`DisplayMsg_t` chở **cả cụm** (menuIndex + statusText + state + selectedMode),
+nhưng có **hai producer** cùng gửi vào `xDisplayQueue`, và mỗi bên chỉ biết một
+phần:
+
+| Producer | Biết | Phải bịa |
+| --- | --- | --- |
+| WashingManager | state, statusText, selectedMode | `menuIndex` (giữ bản sao riêng `s_menuIndex`) |
+| UITask | menuIndex | `statusText` (bịa bằng hằng `"IDLE"`) |
+
+Vi phạm đúng tiêu chí ownership đã dạy ở Tầng 2: **nội dung màn hình đang có hai
+chủ.**
+
+**Chứng cứ phụ củng cố chẩn đoán:** `ui_task.c:63` khai `DisplayMsg_t disp;` rồi
+chỉ gán `menuIndex` và `statusText`, **để nguyên `state` và `selectedMode` chưa
+khởi tạo** — queue vẫn trung thành copy đủ 36 byte kể cả hai trường rác. Chưa
+gây triệu chứng vì `OLED_Render()` không dùng tới chúng, nhưng nó cho thấy chính
+người viết cũng cảm nhận được UITask không đủ thông tin để dựng một `DisplayMsg_t`
+hoàn chỉnh.
+
+**Ba hướng sửa đã nêu trong tài liệu (§3.6), chưa áp dụng — chờ quyết định:**
+
+| Hướng | Cách làm | Đánh đổi |
+| --- | --- | --- |
+| 1. OLEDTask nhớ trạng thái | Thêm `updateMask` vào `DisplayMsg_t`; OLEDTask giữ khung hình gần nhất, chỉ ghi đè phần được đánh dấu | Sửa ít nhất; OLEDTask không còn là pure renderer |
+| 2. UITask không gửi thẳng OLED | UITask báo "cursor moved" cho WashingManager; bên duy nhất biết đủ mọi thứ dựng `DisplayMsg_t` | Đúng nguyên tắc một chủ nhất; thêm một chặng |
+| 3. Tách hai queue | Một cho trạng thái, một cho con trỏ; OLEDTask ghép | Ranh giới sạch nhất; tốn RAM và một chỗ chờ |
+
+Nghiêng về hướng 2 vì hợp nguyên tắc "WashingManager là chủ duy nhất của trạng
+thái", nhưng cả ba đều hợp lệ.
+
+**Đã sửa ngay trong tài liệu:** Thí nghiệm A của Tầng 1 bảo người học bấm PA0 lúc
+đang giặt, nhưng không nhắc gì tới việc dòng trạng thái nhảy về `IDLE`. Đã thêm
+ghi chú cảnh báo đây là lỗi thật, kèm câu hỏi gợi mở dẫn sang Tầng 3 ("đèn vẫn
+đúng nhưng chữ thì sai — hai thứ đó đi bằng hai đường khác nhau, đường nào?").
+
+---
+
+### Nội dung Tầng 3
+
+**Cách ngây thơ được chọn để bác bỏ:** biến toàn cục + `volatile`. Bốn lỗ hổng
+xếp theo độ khó phát hiện tăng dần: mất sự kiện → không block được → race trên
+đọc-sửa-ghi (`LDR`/`ADD`/`STR`) → **struct bị đọc nửa vời**. Nhấn mạnh
+`volatile` **không** cho tính nguyên tử — hiểu nhầm phổ biến nhất về từ khoá này.
+
+**Bốn tính chất của Queue**, mỗi tính chất khớp một lỗ hổng: có chiều sâu · chặn
+được hai chiều · thao tác nguyên tử · **sao chép theo giá trị**.
+
+**Thí nghiệm A (quyết định):** thêm `disp.menuIndex = 99u;` **ngay sau**
+`xQueueSend()` trong `ui_task.c:68`. Con trỏ vẫn nhảy đúng → chứng minh queue đã
+chụp ảnh 36 byte trong lúc hàm còn chạy, không giữ con trỏ. Lập luận sắc hơn đi
+kèm: `disp` nằm trên stack UITask và khung stack đó bị thu hồi rất lâu trước khi
+OLEDTask (prio 1) được chạy — nếu queue giữ con trỏ thì đây là dangling pointer
+100 % lần nào cũng dính.
+
+**Thí nghiệm B:** bấm PD2 giữa lúc đang giặt → lệnh nằm đệm trong `xCommandQueue`
+→ tới `FINISH` bị `xQueueReset()` dọn → máy đứng yên. Bỏ dòng reset đó đi chính
+là **Bug #10**.
+
+**Điểm thiết kế được nhấn mạnh:** vì sao **mọi** chỗ gửi đều dùng timeout `0`.
+Nếu `Manager_PostDisplay()` dùng `portMAX_DELAY`, WashingManager (prio 3) sẽ bị
+OLEDTask (prio 1) chặn — đảo ưu tiên thủ công. Quy tắc mang đi được: *bên gửi ở
+priority cao không bao giờ được block chờ bên nhận ở priority thấp.*
+
+Câu 2 mục Tự kiểm tra mở rộng thêm một bước suy luận đáng tập thành phản xạ:
+chặn UITask không chỉ làm chậm UITask — UITask là bên tiêu thụ duy nhất của
+`xButtonQueue`, nó dừng thì queue nút bấm đầy dần. **Chặn một task luôn kéo theo
+hậu quả lan ngược lên thượng nguồn của nó.**
+
+**Giữ kỷ luật một tầng một khái niệm:** `xQueueSendFromISR` và
+`portYIELD_FROM_ISR` được trích và giải thích ở mức "chuyện gì xảy ra theo trình
+tự", nhưng PendSV/BASEPRI/NVIC để nguyên cho Tầng 6.
+
+---
+
+### Sửa kèm trong code
+
+`freertos_objects.c` — comment ghi `sizeof(CommandMsg_t) = 4 + 4 = 8 bytes`, sai
+từ khi trường `menuIndex` được thêm vào struct. Thực tế là `4 + 4 + 1 + 3 padding
+= 12`. Đã sửa cả dòng đó lẫn bảng "Approximate RAM cost" (`~116` → `~136`,
+tổng `~544` → `~564`). Build lại: sạch.
+
+Lần thứ ba trong project phát hiện **comment mô tả sai code thật** (trước đó:
+`app_events.h` ở Session 09, `bsp_button.h` ở Session 13). Củng cố nguyên tắc đã
+ghi ở "Bài học phương pháp": comment không được compiler kiểm tra, chỉ phát hiện
+sai khi chủ động đối chiếu.
+
+---
+
+## Session 13 — 2026-08-29 — Dọn tàn dư short/long press trong bsp_button.c
+
+**Chủ đề:** Người dùng phát hiện `BSP_Button_IRQHandler()` vẫn còn bộ máy đo
+thời lượng nhấn, dù thiết kế short/long press đã bỏ từ lâu. Truy vết, thiết kế
+lại bộ lọc nhiễu, áp dụng cho cả hai nút.
+
+---
+
+### Q1: "code chỗ này chưa sửa thì phải làm gì còn long short press gì nữa"
+
+**Quan sát của bạn:** đúng. Kiểm tra lại tìm ra ba tàn dư:
+
+| # | Tàn dư | Vị trí |
+| --- | --- | --- |
+| 1 | Macro chết `BUTTON_LONG_PRESS_MS` — grep toàn bộ `App/` + `Core/Src/`: không `.c` nào dùng | `app_config.h:35` |
+| 2 | Bộ máy đo thời lượng: `s_pressStartMs`, `s_pressed`, biến `duration` | `bsp_button.c:28-29, 44-52` |
+| 3 | Comment tự mâu thuẫn: "check duration for debounce, then fire short press" rồi ngay dưới phải đính chính "Long-press is no longer handled" | `bsp_button.c:47, 53-54` |
+
+**Hệ quả thật, không chỉ là thẩm mỹ:** cấu trúc `if (rising) ghi giờ / else
+(falling) bắn sự kiện` khiến sự kiện **chỉ bắn khi THẢ TAY**. Đó là ràng buộc
+bắt buộc của thiết kế cũ (phải đợi buông mới đo được thời lượng), nhưng vô nghĩa
+sau khi long-press bị bỏ. Giữ nút PA0 3 giây thì con trỏ menu đứng im tới lúc
+buông. Nút PD2 ngay bên dưới thì bắn ngay lúc bấm — **hai nút cùng project, hai
+triết lý khác nhau, và khác biệt đó không do yêu cầu nào cả.**
+
+Đây cũng chính là điều kiện kích hoạt **Bug #8** ngày trước.
+
+---
+
+### Q2: Phát hiện thêm — PD2 hoàn toàn không có bộ lọc nhiễu
+
+`BSP_StartButton_IRQHandler()` bắn `BTN_EVENT_CONFIRM` trên **mọi** cạnh xuống.
+Một lần bấm dội 3-4 cạnh = 3-4 sự kiện CONFIRM.
+
+Triệu chứng đang bị che đi chứ không phải không có: `Manager_OnEnterIdle/Finish/
+Error` đều gọi `xQueueReset(xCommandQueue)` nên lệnh thừa bị dọn ở hạ nguồn.
+**Hạ nguồn dọn rác cho thượng nguồn** — thượng nguồn vẫn đang sinh sự kiện giả.
+
+**Bạn quyết:** cải tiến cả PD2.
+
+---
+
+### Thiết kế đã chọn: lọc theo khoảng lặng (*quiet window*)
+
+```c
+uint32_t now   = HAL_GetTick();
+uint8_t  quiet = ((now - s_lastEdgeMs) >= BUTTON_DEBOUNCE_MS) ? 1u : 0u;
+
+s_lastEdgeMs = now;        /* MỌI cạnh đều nạp lại — kể cả cạnh bị từ chối */
+
+if (pressed && quiet && (s_callback != NULL)) { s_callback(...); }
+```
+
+Điểm mấu chốt là `s_lastEdgeMs = now;` nằm **ngoài** mọi điều kiện.
+
+**Phương án ngây thơ đã loại:** "bỏ qua cạnh cách *sự kiện đã chấp nhận* gần nhất
+dưới 50 ms". Hỏng khi giữ nút lâu: chùm dội lúc nhả cách sự kiện trước 2 giây →
+lọt thành sự kiện giả. Phải so với **cạnh gần nhất**, không phải **sự kiện gần
+nhất**.
+
+**Phương án thứ hai đã loại:** đọc thêm mức chân cho PD2 để xác nhận nút đang bị
+đè. Lúc dội khi bấm, ISR có thể đọc trúng mức nhả và **từ chối cả lần bấm thật**
+— đổi một lỗi hiếm lấy một lỗi thường xuyên. Không đáng.
+
+**Giới hạn đã biết, ghi thẳng vào comment thay vì lờ đi:** `.ioc` cấu hình EXTI2
+chỉ cạnh xuống, nên ISR của PD2 không nhìn thấy cạnh nhả. Dội trong một lần bấm
+bị lọc sạch, nhưng cạnh đầu của chùm dội lúc *nhả* vẫn có thể lọt thành một
+CONFIRM thừa. Muốn triệt để phải bật cả hai cạnh cho PD2 trong CubeMX — đã thống
+nhất **không đụng `.ioc`** để tránh rủi ro CubeMX reset GPIOD (tiền lệ ghi trong
+`GPIO_CONFIG.md`).
+
+---
+
+### Files đã sửa
+
+| File | Sửa gì |
+| --- | --- |
+| `App/BSP/Src/bsp_button.c` | Viết lại cả hai ISR theo quiet-window; xóa `s_pressStartMs`/`s_pressed`; mỗi nút một biến timestamp riêng (dùng chung sẽ khiến bấm nút này khoá nút kia 50 ms) |
+| `App/BSP/Inc/bsp_button.h` | Sửa "on release" → "on press"; **khôi phục dòng tiêu đề "Button 2 — Start / Confirm (PD2)"** vốn bị mất, khiến khối comment đọc như thể vẫn đang mô tả PA0 |
+| `App/Common/Inc/app_config.h` | Xóa `BUTTON_LONG_PRESS_MS`; viết lại comment của `BUTTON_DEBOUNCE_MS` cho khớp cơ chế mới |
+| `App/Common/Inc/app_types.h` | Comment "the BSP measures duration" — sai từ khi bỏ long press |
+| `docs/LEARNING_NOTES.md` | Viết lại mục "Design: Debounce"; đánh dấu mục "macro chết" là đã dọn |
+
+**Build:** `make all` thành công, `bsp_button.c` **không một warning**.
+`text 37880 / data 44 / bss 85812`.
+
+---
+
+### Bài học phương pháp
+
+**Macro chết chỉ là phần dễ thấy của một refactor bỏ dở.** Phần nguy hiểm hơn là
+*cấu trúc điều khiển* mà tính năng cũ để lại — ở đây là việc sự kiện bắn ở cạnh
+nhả tay. Macro không dùng thì vô hại; cấu trúc thừa thì vẫn đang **quy định hành
+vi thật của hệ thống**, và không ai chất vấn nó vì "code đang chạy được".
+
+Khi bỏ một tính năng, phải truy ngược: **tính năng đó đã áp đặt những ràng buộc
+nào lên phần còn lại?** Rồi gỡ luôn các ràng buộc đó.
+
+---
+
+### Q3: Dọn nốt warning phát sinh lúc build — ✅ đã xong
+
+Build cảnh báo `implicit declaration of function 'BSP_Sensor_Poll'`
+(`sensor_task.c:21`). Nguyên nhân: `bsp_sensor.h` **thiếu prototype** cho cả
+`BSP_Sensor_Init()` lẫn `BSP_Sensor_Poll()` — chỉ khai báo hai hàm `Is*()`.
+
+**Vì sao nguy hiểm dù code vẫn chạy:** thiếu prototype thì trình biên dịch tự
+giả định `int f()`. Ở đây đúng được là **nhờ may** — hàm `void f(void)` trên ARM
+EABI tình cờ khớp cách truyền tham số/giá trị trả về. Nếu hàm có tham số, hoặc
+trả về kiểu khác `int`, chương trình sẽ hỏng theo kiểu rất khó truy. Từ C23 đây
+là **lỗi cứng**, không còn là cảnh báo.
+
+**Đã sửa, ba chỗ:**
+
+| Chỗ | Sửa gì |
+| --- | --- |
+| `bsp_sensor.h` | Thêm prototype `BSP_Sensor_Init()` và `BSP_Sensor_Poll()` kèm doc |
+| `main.c` | Thêm `#include "bsp_sensor.h"` (trong `USER CODE BEGIN Includes`) — header có prototype nhưng `main.c` chưa hề include, nên `BSP_Sensor_Init()` ở dòng 110 vẫn implicit |
+| `oled_task.c` | Xóa biến `char line[22]` không dùng tới (`-Wunused-variable`) |
+
+Bài học nhỏ: thêm prototype vào header **chưa đủ** — phải kiểm tra mọi nơi gọi
+đã include header đó chưa. Warning thứ nhất biến mất ở `sensor_task.c` nhưng
+vẫn còn nguyên ở `main.c`, chỉ lộ ra khi **build sạch** (`make clean`) chứ
+build tăng dần không biên dịch lại `main.c`.
+
+**Kết quả:** `make clean && make all` → **0 warning, 0 error** trên toàn project.
+`text 37880 / data 44 / bss 85812`.
+
+---
+
 ## Session 07 — 2026-07-10 — Test thủ công WashingManager & Bug #8/#9
 
 **Chủ đề:** Soạn kịch bản test tay cho state machine, phát hiện và fix race
@@ -540,6 +907,320 @@ trả lời được "có sinh đúng sự kiện không". Phát hiện thêm c�
 test "Component" (cảm biến giả) để bắt được loại này.
 
 ---
+
+## Session 11 — 2026-08-24 — Task Notification & phát hiện tài liệu lỗi thời
+
+**Chủ đề:** Bắt đầu module Task Notification (mentoring roadmap #4); trên
+đường học phát hiện và sửa một phần Phase 3 của `LEARNING_NOTES.md` đã lỗi
+thời so với code thật.
+
+---
+
+### Q1: Đường dẫn ISR PA0 → `xButtonQueue` → UITask trong project — có nên thay bằng Task Notification không?
+
+**Trả lời của bạn:** Không nên, vì "button có thể gửi nhiều tín hiệu mà task
+notify chỉ bắt được 1 cái, sẽ gây ra miss command".
+
+**Đánh giá:** Kết luận đúng, cơ chế nêu ra chưa chính xác. Task Notification
+không "rớt" sự kiện thứ 2 như queue tràn — `eSetBits`/`eIncrement` đều
+**tích luỹ** (`ulNotifiedValue |= ulValue` hoặc `++`). Vấn đề thật là **mất
+danh tính và thứ tự**: nếu `NAVIGATE=bit0`, `CONFIRM=bit1` và cả hai đến
+trước khi task đọc, giá trị cuối chỉ còn `0b11` — không biết đã bấm NAVIGATE
+mấy lần, không biết thứ tự. Ngược lại, nếu chỉ có **một loại tín hiệu duy
+nhất lặp lại** thì `eIncrement` (`xTaskNotifyGive`/`ulTaskNotifyTake`) không
+mất gì cả — đây chính là mẫu "counting semaphore nhanh hơn" chính thức của
+FreeRTOS. Quy tắc chọn: nhiều loại cần phân biệt + giữ thứ tự → Queue; một
+loại lặp lại, chỉ cần đếm → Task Notification.
+
+---
+
+### Q2: Đường dẫn UITask → `xCommandQueue` → WashingManager — ứng viên tốt hơn?
+
+**Đánh giá câu hỏi mở — chưa có câu trả lời trực tiếp từ người dùng, phân
+tích được đưa ra kèm câu hỏi tiếp theo:** Đây là ứng viên **tốt hơn** case
+Q1 vì WashingManager chỉ đọc queue lúc IDLE/FINISH/ERROR, xử lý đúng 1 lệnh
+rồi rời state ngay, và thiết kế hiện tại **đã tự vứt bỏ backlog** qua
+`xQueueReset()` ở `OnEnterIdle/OnEnterFinish/OnEnterError` — tức là chỉ quan
+tâm lệnh mới nhất, đúng ngữ nghĩa `eSetValueWithOverwrite`. Có thể đóng gói
+`command|mode|menuIndex` vào một `uint32_t` và bỏ hẳn 3 lời gọi
+`xQueueReset()` rải rác. Đánh đổi: Task Notification cần UITask biết handle
+cụ thể của WashingManager (khớp nối chặt hơn queue trung lập).
+
+---
+
+### Q3: "Từ giờ không cần trace lại source FreeRTOS sau mỗi câu hỏi, dựa vào kiến thức trong các file này"
+
+**Ghi nhận:** Đã lưu thành memory `feedback_reuse_verified_knowledge` — chỉ
+tra lại `OS/FreeRTOS/` khi gặp khẳng định thật sự mới hoặc nghi ngờ điều đã
+ghi trước đó sai; kiến thức đã trích dẫn trong `LEARNING_NOTES.md`/`QA_LOG.md`
+thì dùng lại trực tiếp. Đọc code của project (`App/`, `Core/`) không thuộc
+phạm vi hạn chế này — vẫn đọc bình thường mỗi khi cần.
+
+---
+
+### Q4: "Sao file learning vẫn còn phần này" (ảnh chụp `Design: Short Press vs Long Press`)
+
+**Phát hiện:** Đối chiếu `bsp_button.c` thật thì mục "Design: Short Press vs
+Long Press" ở Phase 3 (`LEARNING_NOTES.md`) mô tả kiến trúc **đã không còn
+tồn tại** — một nút PA0 duy nhất phân biệt short/long press bằng thời lượng
+nhấn giữ (`duration >= BUTTON_LONG_PRESS_MS`). Code thật hiện dùng **hai nút
+vật lý riêng biệt** (PA0 = navigate sau debounce, PD2 = confirm ngay khi có
+falling edge), không còn đo thời lượng. Đây là hệ quả của Bug #8 (PA0 dùng
+chung với door sensor gây race condition) và hành trình đổi chân
+PE1→PD4→PD2 (Bug #14/#15/#16) — Phase 3 được viết **trước** các thay đổi đó
+và không ai quay lại đối chiếu.
+
+**Phát hiện thêm:** sơ đồ gốc "ISR → Queue → Task" cũng bỏ sót một tầng thật
+— `bsp_button.c` không hề gọi `xQueueSendFromISR()` trực tiếp; nó gọi qua
+con trỏ hàm callback (đăng ký bởi `UITask`), và `xQueueSendFromISR()` +
+`portYIELD_FROM_ISR()` thực chất nằm trong `Button_EventCallback()` ở
+`ui_task.c`. Đây chính là cơ chế giữ Design Rule #3 ("Drivers must not
+depend on FreeRTOS") — bị thiếu hoàn toàn trong tài liệu gốc.
+
+**Phát hiện phụ:** `BUTTON_LONG_PRESS_MS` (`app_config.h:35`, giá trị
+`1500U`) vẫn còn định nghĩa nhưng **không còn nơi nào trong code sử dụng** —
+dead code sau refactor.
+
+**Đã sửa:** Viết lại toàn bộ mục "Design: ISR → Queue → Task Pattern" (đổi
+tên thành "ISR → Callback → Queue → Task Pattern"), "Design: Short Press vs
+Long Press" (đổi tên thành "Navigate vs Confirm", có bảng so sánh thiết kế
+cũ/mới), và "What I Should Learn" trong `LEARNING_NOTES.md` Phase 3, kèm ghi
+chú lịch sử trỏ về Bug #8 và #14/#15/#16 để không mất giá trị tham chiếu.
+
+**Bài học:** đây là lần thứ hai phát hiện Part I (ghi theo phase xây dựng)
+lỗi thời so với code thật — lần trước là 3 comment trong `app_events.h`
+(Session 09). Xác nhận lại nguyên tắc đã ghi ở "Bài học phương pháp" mục 2:
+tài liệu không được compiler kiểm tra, chỉ phát hiện được khi chủ động đối
+chiếu lại với code.
+
+---
+
+## Session 12 — 2026-08-29 — Thiết kế tài liệu nhập môn START_HERE.md
+
+**Chủ đề:** Không phải kiến thức FreeRTOS mới, mà là **thiết kế tài liệu học**:
+viết file dẫn đường thế nào để người chưa từng dùng RTOS hiểu được project.
+
+---
+
+### Q1: Người đọc mục tiêu của file learning là ai?
+
+**Ba phương án đưa ra:** (1) chính bạn — ôn lại, (2) người mới hoàn toàn, (3)
+người phỏng vấn / đồng nghiệp cần nắm kiến trúc trong 30 phút.
+
+**Bạn chọn:** (2) — người mới hoàn toàn: biết C, biết HAL cơ bản, chưa từng
+dùng RTOS.
+
+**Ràng buộc kéo theo:**
+
+| Ràng buộc | Hệ quả lên cách viết |
+| --- | --- |
+| Chưa từng dùng RTOS | Không dùng *block / preempt / context switch / yield / ISR-safe* trước khi định nghĩa. Mỗi thuật ngữ có **một** điểm định nghĩa duy nhất |
+| Biết HAL, quen superloop | HAL là điểm tựa bắc cầu: mỗi khái niệm mới mở đầu bằng "trong superloop bạn làm thế này… nó hỏng ở đây" |
+| Đọc để hiểu project này | Không ví dụ bịa — mọi đoạn code trích thật từ `App/`, kèm `file:dòng` |
+
+---
+
+### Q2: Người học có board STM32F411E-DISCO trong tay khi đọc không?
+
+**Bạn chọn:** có board, nạp được firmware.
+
+**Hệ quả:** mục "Thí nghiệm" của mỗi tầng viết dạng **mệnh lệnh** (nạp code,
+bấm nút này, quan sát LED kia), không cần kèm sẵn số liệu đo trước. File mỏng
+hơn và học sâu hơn, đổi lại người không có board sẽ đọc bị hụt.
+
+---
+
+### Chẩn đoán trước khi viết
+
+Đối chiếu bộ tài liệu hiện có: `LEARNING_NOTES.md` (3352 dòng) là **reference**
+— sắp theo primitive (Phần A) và theo thứ tự lịch sử xây dựng (Phần B). Cả hai
+thứ tự đều là thứ tự của người đã biết. Người mới mở ra sẽ gặp
+`struct EventGroupDef_t` ngay §1.1 — kiến thức trang 200 đặt ở trang 1.
+
+Thiếu sót thật: **không có cửa vào**. 6 file trong `docs/` + 2 file gốc, không
+file nào nói "bắt đầu ở đây, đọc theo thứ tự này".
+
+**Quyết định:** không sửa `LEARNING_NOTES.md`. Viết thêm một file mỏng làm
+xương sống dẫn đường (`docs/START_HERE.md`), **link** sang các file kia thay vì
+chép lại. Quy tắc chống trùng lặp: *một sự thật chỉ nằm ở một chỗ.*
+
+---
+
+### Bảy nguyên tắc đã chốt cho START_HERE.md
+
+1. **Vấn đề trước, primitive sau** — mở chương bằng nhu cầu cảm nhận được, không
+   bằng định nghĩa API.
+2. **Cho xem cách làm sai trước** — mỗi primitive sinh ra để thay một cách ngây
+   thơ; phải thấy nỗi đau mới nhớ được giá trị của công cụ.
+3. **Neo vào code thật của repo**, kèm `file:dòng` — không pseudo-code.
+4. **Mỗi tầng phải quan sát được bằng mắt** — chỉ bằng LED, OLED và nút bấm.
+5. **Dự đoán trước, đo sau** — chỗ dự đoán sai là chỗ mô hình tư duy sai.
+6. **Một tầng = một khái niệm mới**, không dùng thuật ngữ chưa định nghĩa.
+7. **Nông ở đây, sâu ở LEARNING_NOTES** — cắt độ sâu ở mức đủ hiểu code project.
+
+---
+
+### Khung 7 tầng đã chốt
+
+| Tầng | Tên | Câu hỏi trung tâm |
+| --- | --- | --- |
+| 0 | Sờ vào hệ thống | Cái máy này làm gì? |
+| 1 | Vì sao cần RTOS | Ba việc cùng lúc — superloop hỏng ở đâu? |
+| 2 | Bốn task của project | Ai làm gì, ai quan trọng hơn ai? |
+| 3 | Task nói chuyện với nhau | Dữ liệu đi từ task này sang task kia bằng gì? |
+| 4 | Chờ nhiều điều kiện | Chờ "cửa đóng VÀ nước đầy" kiểu gì? |
+| 5 | Trái tim: State Machine | Máy giặt "đang ở đâu" lưu ở chỗ nào? |
+| 6 | Từ chân MCU đến task | Nút bấm đi qua những bước nào? |
+
+Khuôn cố định 7 mục cho mọi tầng: Hiện tượng → Cách ngây thơ → Ý tưởng → Code
+thật → Thí nghiệm → Tự kiểm tra → Đào sâu.
+
+---
+
+### Q3: Có đưa phần công cụ debug (SystemView / RTT / logic analyzer) vào lộ trình không?
+
+**Bạn quyết:** chưa cần, để sau.
+
+**Đã sửa:** bỏ tầng "Nhìn thấy hệ thống chạy" khỏi lộ trình (còn 7 tầng: 0–6),
+thêm ghi chú "Để sau" ở `START_HERE.md` §0.3, và đổi comment hai dòng
+`SEGGER_SYSVIEW_*` trong trích đoạn `main.c` thành "chưa dùng tới → bỏ qua".
+
+**Hệ quả về mặt sư phạm — đáng ghi lại:** ràng buộc này *tốt cho tài liệu*.
+Toàn bộ 7 tầng giờ chỉ cần board + LED + nút bấm, không phụ thuộc công cụ nào
+ngoài STM32CubeIDE. Người học không bị chặn ở Tầng 0 vì chưa cài được
+SystemView. Nguyên tắc số 4 ("mỗi tầng phải quan sát được bằng mắt") vẫn giữ
+nguyên — chỉ đổi phương tiện quan sát từ trace sang đèn LED, mà đèn LED thì
+trực quan hơn với người mới.
+
+Khi nào bổ sung tầng debug thì đánh số tiếp là Tầng 7 — kiến thức nền đã có sẵn
+ở `LEARNING_NOTES.md` §B.8 và Session 06 của file này.
+
+---
+
+### Đã viết: Tầng 0 và Tầng 1
+
+Viết dần từng tầng theo quy tắc "không sinh cả project một lượt" trong
+`CLAUDE.md` — chỉnh khuôn ở 2 tầng đầu rẻ hơn chỉnh ở tầng thứ 8.
+
+**Thí nghiệm chủ lực của Tầng 1** (đóng góp mới của phiên này): đổi
+`vTaskDelay()` → `HAL_Delay()` trong `sensor_task.c:34`, dự đoán rồi đo. Suy
+luận từ bảng priority (WashMgr 3, UITask 2, Sensor 2, OLED 1) và
+`configUSE_TIME_SLICING = 1`:
+
+- WashMgr (prio 3) — vẫn chạy, priority cao hơn nên chen vào được.
+- UITask (prio 2) — vẫn chạy, **bằng** priority nên được chia CPU theo vòng.
+- OLEDTask (prio 1) — **starvation**, không bao giờ được chọn → màn hình đứng.
+
+Giá trị sư phạm: chương trình **không crash**. Đèn vẫn chạy, nút vẫn ăn, chỉ
+màn hình chết — đúng loại bug mà người mới sẽ đi tìm nhầm trong driver OLED.
+Cho thấy `HAL_Delay()` trong task không phải lỗi chức năng mà là lỗi thiết kế,
+và lỗi thiết kế thì im lặng.
+
+Ghi chú: project chuyển HAL timebase sang TIM riêng
+(`Core/Src/stm32f4xx_hal_timebase_tim.c`) nên `HAL_Delay()` **vẫn chạy đúng
+chức năng** — chính điều đó làm bug khó nhận ra hơn.
+
+---
+### Q4: Duyệt Tầng 0–1 — nhịp độ đạt, nhưng cách trình bày đáp án phải sửa
+
+**Phản hồi của bạn:** "nhịp độ tầng 0 1 ổn rồi, tuy nhiên các câu hỏi cần có
+trả lời và giải thích rõ ngay ở bên dưới".
+
+**Chẩn đoán:** bản đầu để đáp án trong khối `<details><summary>` gấp lại ở cuối
+mỗi tầng. Hai vấn đề:
+
+1. **Mất mạch đọc** — người học phải cuộn xuống cuối tầng tìm đáp án rồi cuộn
+   ngược lại.
+2. **`<details>` không phải markdown chuẩn** — nó là HTML nhúng. GitHub render
+   được, nhưng bản preview của STM32CubeIDE và một số editor thì không; khi đó
+   đáp án **biến mất hoàn toàn** hoặc hiện ra dạng thẻ HTML thô.
+
+**Đã sửa:**
+
+- Bỏ toàn bộ khối `<details>` trong `START_HERE.md`.
+- Cấu trúc mới cho mỗi câu: `**Câu N. <câu hỏi>**` → `**Trả lời:** ...` →
+  giải thích dày → `---` ngăn cách.
+- **Viết lại giải thích dày hơn hẳn bản cũ**, không chỉ chuyển vị trí:
+
+| Câu | Bản cũ | Bản mới |
+| --- | --- | --- |
+| 0.6 Q1 (LED thay motor) | 3 dòng | 3 lợi ích cụ thể, trong đó lợi ích thứ 3 dẫn thẳng sang lý do tồn tại của `App/BSP/` (bắc cầu sang Tầng 2) |
+| 0.6 Q2 (ai điều khiển) | 2 dòng | Bảng so sánh bare-metal vs RTOS + giải thích `vTaskStartScheduler()` chỉ return khi thiếu heap tạo Idle task |
+| 0.6 Q3 (cái gì đếm 10 s) | 3 dòng | Nêu rõ **mâu thuẫn** timer giải quyết: không thể vừa đếm giờ vừa chờ sự kiện trên một luồng |
+| 1.6 Q1 (priority ≠ CPU) | 5 dòng | Bảng "priority cao nghĩa là / không nghĩa là" + quy tắc gán priority thực tế (theo độ gấp, không theo độ quan trọng) |
+| 1.6 Q2 (`vTaskDelay` 100 ms) | 4 dòng | Sơ đồ 3 mốc `Blocked → Ready → Running`, phân biệt điều RTOS đảm bảo và không đảm bảo, nối sang drift và `vTaskDelayUntil` |
+| 1.6 Q3 (stack 512 bytes) | 6 dòng | Thêm: vì sao crash lệch chỗ, vì sao compiler bó tay (`sprintf` ngốn stack), bảng 2 công cụ phòng ngừa, và cách làm thực tế: cấp dư → đo high-water-mark → cắt |
+
+- Kết quả Thí nghiệm B cũng bỏ `<details>`, thay bằng tiêu đề
+  **"⛔ Dừng lại — viết dự đoán ra giấy xong mới đọc tiếp"** rồi trình bày công
+  khai. Giữ được kỷ luật dự-đoán-trước mà không phụ thuộc HTML.
+
+**Nguyên tắc bổ sung vào bộ quy tắc viết tài liệu (thành nguyên tắc số 8):**
+đáp án và giải thích luôn nằm ngay dưới câu hỏi. Tài liệu học không được dùng
+cơ chế "giấu đi rồi mở ra" — nó đánh đổi tính chắc chắn của việc đọc lấy một
+chút gọn gàng hình thức, và đó là đánh đổi sai.
+
+---
+
+### Q5: Viết Tầng 2 — "Bốn task của project"
+
+**Yêu cầu:** viết tiếp theo khuôn đã duyệt.
+
+**Câu hỏi trung tâm được chọn cho tầng này:** không phải "bốn task này làm gì"
+(cái đó tra `SYSTEM_DIAGRAMS.md` là ra), mà **"chia hệ thống thành bao nhiêu
+task, theo tiêu chí gì?"** — đây mới là chỗ người mới thực sự mắc kẹt, và là
+kiến thức mang được sang project khác.
+
+**Cách ngây thơ được chọn để bác bỏ:** chia task **theo đồ vật**
+(`MotorTask`, `ValveTask`, `LedTask`...). Đây là sai lầm tự nhiên ngay sau khi
+học xong Tầng 1 — biết RTOS có nhiều task thì lao sang thái cực chia quá nhỏ.
+Ba lý do bác bỏ, xếp tăng dần: tốn RAM → task rỗng không có việc → **trạng thái
+hệ thống bị xé nát, không ai sở hữu, buộc phải dùng biến toàn cục**.
+
+**Bốn tiêu chí chia task (nội dung chính của tầng):**
+
+| # | Tiêu chí | Câu hỏi |
+| --- | --- | --- |
+| 1 | Nguồn chờ (blocking source) | Việc này nằm chờ cái gì? |
+| 2 | Nhịp (rate) | Định kỳ hay theo sự kiện? |
+| 3 | Độ gấp (latency) | Chậm 100 ms có sao không? |
+| 4 | Quyền sở hữu (ownership) | Tài nguyên chung này ai được đụng? |
+
+Tiêu chí 1 đặt lên đầu vì nó giải thích *chính xác* vì sao project này có 4 task:
+bốn task nằm chờ bốn nguồn khác nhau (`xButtonQueue` / `xDisplayQueue` /
+`xCommandQueue` / `vTaskDelay`).
+
+**Hai thí nghiệm:**
+
+- **A (không sửa code)** — bấm PD6 ở `IDLE` (không có gì xảy ra) rồi bấm PD6 ở
+  `FILL_WATER` (chuyển trạng thái ngay). Cùng một nút, cùng đoạn code trong
+  `sensor_task.c`, phản ứng khác nhau vì **WashingManager đổi nguồn chờ theo
+  trạng thái**. Dạy được ý cốt lõi: *lọc sự kiện bằng lựa chọn nguồn chờ, không
+  bằng chuỗi `if`.*
+- **B (sửa 1 dòng)** — đổi `MOTOR_PIN` từ `GPIO_PIN_12` sang `GPIO_PIN_13` trong
+  `bsp_motor.c:40`. Kết quả kiểm chứng được bằng mắt: đèn xanh lá **không sáng
+  lần nào** trong cả chu trình, đèn cam gánh vai trò motor. Điểm dạy: **0 dòng
+  phải sửa trong `washing_manager.c`** — giá trị lớp BSP được người học tự tay
+  chứng minh, không phải nghe kể.
+
+  Thí nghiệm B còn có tác dụng phụ đắt giá: PD13 giờ có **hai chủ** (van + motor),
+  và kết quả chỉ đúng vì thứ tự lệnh trong callback tình cờ hợp lý
+  (`Valve_Close()` chạy trước `Motor_Start()`). Đây là tiêu chí 4 (ownership)
+  áp dụng ở mức chân MCU thay vì mức task — nối liền hai ý mà không cần thêm
+  khái niệm mới.
+
+**Câu 3 của mục Tự kiểm tra nối vào lịch sử thật của project:** "vì sao
+WashingManager không tự đọc PD5?" → dẫn tới **Bug #8** (`bsp_sensor.c` từng đọc
+cửa qua PA0, trùng chân nút menu). Tài liệu học dùng được bug thật của chính
+project làm ví dụ là thứ sách vở không có.
+
+**Giữ kỷ luật "một tầng một khái niệm":** code trích ở §2.4 có
+`xQueueReceive()` và `xEventGroupWaitBits()`, nhưng tầng này **không giải thích
+cơ chế** của chúng — chỉ dùng chúng làm bằng chứng cho "mỗi task chờ một nguồn
+khác nhau", kèm ghi chú trỏ sang Tầng 3 và Tầng 4.
+
+---
+
 
 ## Session 06 — 2026-06-26 — Phase 8: SEGGER SystemView
 

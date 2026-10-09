@@ -1,226 +1,385 @@
-<!DOCTYPE html>
-<html lang="vi">
+<!doctype html>
+<html lang="vi" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Washing Machine Simulator — Visual Reference</title>
 <!--
-  Generated from docs/SYSTEM_DIAGRAMS.md — keep that file as the source of truth
-  and regenerate this HTML when the diagrams change.
-  Mermaid is loaded from CDN: an internet connection is needed to render diagrams.
+  GENERATED FILE — do not edit by hand.
+  Source of truth: docs/SYSTEM_DIAGRAMS.md
+  Rebuild:         cd tools && npm install && npm run build
+  Diagrams are drawn by Mermaid, loaded from a CDN (internet needed to draw them;
+  without it the diagram source is shown as text).
 -->
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('doc-theme'); } catch (e) {}
+    if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
 <style>
-  :root {
-    --bg: #ffffff;
-    --fg: #24292f;
-    --muted: #57606a;
-    --border: #d0d7de;
-    --code-bg: #f6f8fa;
-    --accent: #0969da;
-    --tip-bg: #ddf4ff;
-    --tip-border: #54aeff;
+/* ==========================================================================
+   Doc viewer styles — inlined into every generated page by build_docs.mjs.
+   ========================================================================== */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --panel: #f6f8fa;
+  --code-bg: #f6f8fa;
+  --accent: #0969da;
+  --accent-soft: #ddf4ff;
+  --bar-h: 48px;
+  --toc-w: 290px;
+
+  --hl-kw: #cf222e;
+  --hl-str: #0a3069;
+  --hl-com: #6e7781;
+  --hl-num: #0550ae;
+  --hl-fn: #8250df;
+  --hl-type: #953800;
+}
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #9198a1;
+  --border: #3d444d;
+  --panel: #151b23;
+  --code-bg: #151b23;
+  --accent: #4493f8;
+  --accent-soft: #10243f;
+
+  --hl-kw: #ff7b72;
+  --hl-str: #a5d6ff;
+  --hl-com: #8b949e;
+  --hl-num: #79c0ff;
+  --hl-fn: #d2a8ff;
+  --hl-type: #ffa657;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: calc(var(--bar-h) + 12px); color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
+html.dg-lock { overflow: hidden; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+/* ---------- top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 50;
+  height: var(--bar-h);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-weight: 600; color: var(--fg); text-decoration: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0; flex: 0 1 auto;
+}
+.docnav { display: flex; gap: 4px; margin-left: auto; overflow-x: auto; }
+.docnav a {
+  color: var(--muted); text-decoration: none; font-size: 14px;
+  padding: 4px 10px; border-radius: 6px; white-space: nowrap;
+}
+.docnav a:hover { background: var(--panel); color: var(--fg); }
+.docnav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.icon-btn {
+  font: inherit; font-size: 18px; line-height: 1;
+  width: 34px; height: 34px; border-radius: 6px;
+  background: transparent; color: var(--fg);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.icon-btn:hover { background: var(--panel); }
+.toc-toggle { display: none; }
+
+/* ---------- layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: var(--toc-w) minmax(0, 1fr);
+  max-width: 1560px; margin: 0 auto;
+}
+.toc {
+  position: sticky; top: var(--bar-h);
+  height: calc(100vh - var(--bar-h));
+  overflow-y: auto;
+  padding: 18px 10px 40px 14px;
+  border-right: 1px solid var(--border);
+  font-size: 14px; line-height: 1.4;
+}
+.toc ul, .toc ol { list-style: none; margin: 0; padding: 0; }
+.toc a {
+  display: block; color: var(--muted); text-decoration: none;
+  padding: 4px 8px; border-radius: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.toc a:hover { background: var(--panel); color: var(--fg); }
+.toc a.active { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.toc li.grp > a { color: var(--fg); font-weight: 600; margin-top: 4px; }
+.toc li.grp > ul { display: none; margin-left: 10px; border-left: 1px solid var(--border); padding-left: 4px; }
+.toc li.grp.open > ul { display: block; }
+.content { padding: 28px 36px 96px; min-width: 0; }
+.content > * { max-width: 1040px; }
+
+/* ---------- typography ---------- */
+h1, h2, h3, h4 { line-height: 1.25; text-wrap: balance; position: relative; }
+h1 { font-size: 2em; margin: 2em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+.content > h1:first-child { margin-top: 0; }
+h2 { font-size: 1.5em; margin: 2em 0 .6em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+h3 { font-size: 1.2em; margin: 1.6em 0 .5em; }
+h4 { font-size: 1em; margin: 1.4em 0 .4em; }
+.anchor {
+  position: absolute; left: -1.1em; padding-right: .3em;
+  color: var(--muted); text-decoration: none; opacity: 0; font-weight: 400;
+}
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor { opacity: 1; }
+p, ul, ol { margin: .8em 0; }
+li + li { margin-top: .25em; }
+a { color: var(--accent); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+blockquote {
+  margin: 1em 0; padding: .1em 1em;
+  color: var(--muted); border-left: 4px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
+  border-radius: 0 6px 6px 0;
+}
+blockquote > :first-child { margin-top: .6em; }
+blockquote > :last-child  { margin-bottom: .6em; }
+code {
+  font-family: "Cascadia Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: .88em; background: var(--code-bg);
+  padding: .15em .4em; border-radius: 5px;
+}
+pre.code {
+  position: relative; margin: 1em 0; padding: 14px 16px; overflow: auto;
+  background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+  line-height: 1.5; font-size: 13.5px;
+}
+pre.code code { background: none; padding: 0; font-size: inherit; white-space: pre; }
+pre.code[data-lang]:not([data-lang=""])::before {
+  content: attr(data-lang); position: absolute; top: 3px; right: 9px;
+  font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em;
+}
+.hljs-keyword, .hljs-literal, .hljs-selector-tag { color: var(--hl-kw); }
+.hljs-string, .hljs-regexp { color: var(--hl-str); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-number, .hljs-symbol, .hljs-bullet { color: var(--hl-num); }
+.hljs-title, .hljs-title.function_, .hljs-section { color: var(--hl-fn); }
+.hljs-type, .hljs-built_in, .hljs-class .hljs-title { color: var(--hl-type); }
+.hljs-meta, .hljs-meta .hljs-keyword { color: var(--hl-kw); }
+.hljs-meta .hljs-string { color: var(--hl-str); }
+.hljs-addition { color: #1a7f37; } .hljs-deletion { color: #cf222e; }
+
+.table-wrap { overflow-x: auto; margin: 1em 0; }
+table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: .95em; }
+th, td { border: 1px solid var(--border); padding: 6px 12px; vertical-align: top; }
+th { background: var(--panel); text-align: left; }
+tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--panel) 45%, transparent); }
+img { max-width: 100%; }
+
+.doc-footer {
+  margin-top: 4em; padding-top: 1em; border-top: 1px solid var(--border);
+  color: var(--muted); font-size: 13px;
+}
+
+/* ---------- diagrams (zoom / pan) ---------- */
+.dg-slot { margin: 1.2em 0; max-width: none !important; }
+.diagram {
+  margin: 0; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.dg-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.dg-title { font-weight: 600; flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dg-hint  { color: var(--muted); }
+.dg-btns { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.dg-btns button {
+  font: inherit; font-size: 13px; line-height: 1.2;
+  min-width: 30px; padding: 3px 9px; border-radius: 6px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.dg-btns button:hover { border-color: var(--accent); color: var(--accent); }
+.dg-zoom { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dg-view {
+  position: relative; height: 420px; overflow: hidden; outline: none;
+  cursor: grab; user-select: none; -webkit-user-select: none;
+  background-color: var(--bg);
+  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  touch-action: pan-x pan-y;
+}
+.dg-view:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.dg-view.grabbing { cursor: grabbing; }
+.dg-stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+.dg-stage svg { display: block; max-width: none !important; }
+.dg-msg { padding: 16px; color: var(--muted); font-size: 14px; }
+.dg-err pre { margin: 8px 0 0; padding: 10px; background: var(--code-bg); border-radius: 6px; overflow: auto; font-size: 12.5px; }
+
+.diagram.is-full {
+  position: fixed; inset: 0; z-index: 200; border: 0; border-radius: 0;
+  background: var(--bg);
+}
+.diagram.is-full .dg-view { flex: 1 1 auto; height: auto !important; touch-action: none; }
+.diagram.is-full .dg-bar { padding: 10px 14px; }
+
+/* ---------- small screens ---------- */
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .toc-toggle { display: inline-block; }
+  .toc {
+    position: fixed; top: var(--bar-h); left: 0; bottom: 0; z-index: 60;
+    width: min(86vw, 340px); height: auto;
+    background: var(--bg); transform: translateX(-102%);
+    transition: transform .18s ease; box-shadow: 4px 0 18px rgba(0,0,0,.18);
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    padding: 2rem 1rem 4rem;
-    background: var(--bg);
-    color: var(--fg);
-    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
-  }
-  main { max-width: 960px; margin: 0 auto; }
-  h1, h2, h3 { line-height: 1.25; text-wrap: balance; }
-  h1 { font-size: 2em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
-  h2 { font-size: 1.5em; margin-top: 2.2em; padding-bottom: .3em; border-bottom: 1px solid var(--border); }
-  blockquote {
-    margin: 1em 0;
-    padding: .25em 1em;
-    color: var(--muted);
-    border-left: 4px solid var(--border);
-  }
-  code {
-    font-family: Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: .9em;
-    background: var(--code-bg);
-    padding: .15em .35em;
-    border-radius: 4px;
-  }
-  pre.ascii {
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1em;
-    overflow-x: auto;
-    font-family: Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: .82em;
-    line-height: 1.45;
-  }
-  pre.ascii code { background: none; padding: 0; }
-  .diagram {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1em;
-    margin: 1.2em 0;
-    overflow-x: auto;
-    background: #fff;
-  }
-  .diagram pre.mermaid { margin: 0; }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    margin: 1.2em 0;
-    font-size: .92em;
-  }
-  th, td {
-    border: 1px solid var(--border);
-    padding: .45em .7em;
-    text-align: left;
-    vertical-align: top;
-  }
-  th { background: var(--code-bg); }
-  tbody tr:nth-child(even) { background: #fbfcfd; }
-  .tip {
-    background: var(--tip-bg);
-    border-left: 4px solid var(--tip-border);
-    border-radius: 0 6px 6px 0;
-    padding: .6em 1em;
-    margin: .8em 0;
-  }
-  nav.toc {
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1em 1.4em;
-    margin: 1.5em 0 2em;
-  }
-  nav.toc ol { margin: .4em 0 0; padding-left: 1.4em; columns: 2; column-gap: 2.5em; }
-  nav.toc li { margin: .15em 0; break-inside: avoid; }
-  nav.toc a { color: var(--accent); text-decoration: none; }
-  nav.toc a:hover, nav.toc a:focus-visible { text-decoration: underline; }
-  @media (max-width: 640px) { nav.toc ol { columns: 1; } }
-  ul { padding-left: 1.4em; }
+  body.toc-open .toc { transform: none; }
+  .content { padding: 20px 16px 80px; }
+  .dg-hint { display: none; }
+  .anchor { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .toc { transition: none; }
+}
+@media print {
+  .topbar, .toc, .dg-bar { display: none !important; }
+  .layout { display: block; }
+  .dg-view { height: auto !important; overflow: visible; }
+}
+
 </style>
 </head>
 <body>
-<main>
-
-<h1>Washing Machine Simulator — Visual Reference</h1>
-
+<header class="topbar">
+  <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
+  <a class="brand" href="#top">Washing Machine Simulator</a>
+  <nav class="docnav" aria-label="Bộ tài liệu"><a href="START_HERE.html">Học FreeRTOS</a><a href="SYSTEM_DIAGRAMS.html" aria-current="page">Sơ đồ hệ thống</a><a href="../PROJECT_SPEC.html">Đặc tả</a></nav>
+  <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
+</header>
+<div class="layout" id="top">
+  <nav class="toc" aria-label="Mục lục">
+    <ul>
+      <li><a href="#1-kiến-trúc-tổng-thể--tasks--communication-objects" data-id="1-kiến-trúc-tổng-thể--tasks--communication-objects" title="1. Kiến trúc tổng thể — Tasks &amp; Communication Objects">1. Kiến trúc tổng thể — Tasks &amp; Communication Objects</a></li>
+      <li><a href="#2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp" data-id="2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp" title="2. State Machine — Tất cả trạng thái và chuyển tiếp">2. State Machine — Tất cả trạng thái và chuyển tiếp</a></li>
+      <li><a href="#3-kịch-bản-a--full-wash-cycle-bình-thường" data-id="3-kịch-bản-a--full-wash-cycle-bình-thường" title="3. Kịch bản A — Full Wash Cycle (Bình thường)">3. Kịch bản A — Full Wash Cycle (Bình thường)</a></li>
+      <li><a href="#4-kịch-bản-b--spin-only-cycle" data-id="4-kịch-bản-b--spin-only-cycle" title="4. Kịch bản B — Spin-Only Cycle">4. Kịch bản B — Spin-Only Cycle</a></li>
+      <li><a href="#5-kịch-bản-c--error-cửa-mở-giữa-chu-trình" data-id="5-kịch-bản-c--error-cửa-mở-giữa-chu-trình" title="5. Kịch bản C — Error: Cửa Mở Giữa Chu Trình">5. Kịch bản C — Error: Cửa Mở Giữa Chu Trình</a></li>
+      <li><a href="#6-kịch-bản-d--fill-timeout-nước-không-lên" data-id="6-kịch-bản-d--fill-timeout-nước-không-lên" title="6. Kịch bản D — Fill Timeout (Nước Không Lên)">6. Kịch bản D — Fill Timeout (Nước Không Lên)</a></li>
+      <li><a href="#7-button-press-flow--từ-phần-cứng-đến-state-machine" data-id="7-button-press-flow--từ-phần-cứng-đến-state-machine" title="7. Button Press Flow — Từ Phần Cứng Đến State Machine">7. Button Press Flow — Từ Phần Cứng Đến State Machine</a></li>
+      <li><a href="#8-software-timer-flow--cách-timer-lái-state-machine" data-id="8-software-timer-flow--cách-timer-lái-state-machine" title="8. Software Timer Flow — Cách Timer Lái State Machine">8. Software Timer Flow — Cách Timer Lái State Machine</a></li>
+      <li><a href="#9-task-blocking-map--mỗi-task-đang-chờ-gì" data-id="9-task-blocking-map--mỗi-task-đang-chờ-gì" title="9. Task Blocking Map — Mỗi Task Đang Chờ Gì">9. Task Blocking Map — Mỗi Task Đang Chờ Gì</a></li>
+      <li><a href="#10-oled-screen-layout" data-id="10-oled-screen-layout" title="10. OLED Screen Layout">10. OLED Screen Layout</a></li>
+      <li><a href="#11-freertos-object-summary" data-id="11-freertos-object-summary" title="11. FreeRTOS Object Summary">11. FreeRTOS Object Summary</a></li>
+    </ul>
+  </nav>
+  <main class="content">
+<h1 id="washing-machine-simulator--visual-reference">Washing Machine Simulator — Visual Reference<a class="anchor" href="#washing-machine-simulator--visual-reference" aria-label="Liên kết tới mục này">#</a></h1>
 <blockquote>
-  Đọc file này để nắm nhanh toàn bộ luồng hoạt động của project.<br>
-  Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
+<p>Đọc file này để nắm nhanh toàn bộ luồng hoạt động của project.
+Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.</p>
 </blockquote>
-
-<nav class="toc" aria-label="Mục lục">
-  <strong>Mục lục</strong>
-  <ol>
-    <li><a href="#sec1">Kiến trúc tổng thể</a></li>
-    <li><a href="#sec2">State Machine</a></li>
-    <li><a href="#sec3">Kịch bản A — Full Wash Cycle</a></li>
-    <li><a href="#sec4">Kịch bản B — Spin-Only Cycle</a></li>
-    <li><a href="#sec5">Kịch bản C — Error: Cửa mở</a></li>
-    <li><a href="#sec6">Kịch bản D — Fill Timeout</a></li>
-    <li><a href="#sec7">Button Press Flow</a></li>
-    <li><a href="#sec8">Software Timer Flow</a></li>
-    <li><a href="#sec9">Task Blocking Map</a></li>
-    <li><a href="#sec10">OLED Screen Layout</a></li>
-    <li><a href="#sec11">FreeRTOS Object Summary</a></li>
-  </ol>
-</nav>
-
-<h2 id="sec1">1. Kiến trúc tổng thể — Tasks &amp; Communication Objects</h2>
-
+<hr>
+<h2 id="1-kiến-trúc-tổng-thể--tasks--communication-objects">1. Kiến trúc tổng thể — Tasks &amp; Communication Objects<a class="anchor" href="#1-kiến-trúc-tổng-thể--tasks--communication-objects" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Mô tả: <strong>Ai</strong> giao tiếp với <strong>ai</strong> thông qua <strong>cơ chế nào</strong>.</p>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart TD
+<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
     %% --- Hardware layer ---
-    HW_BTN["B1 Button (PA0)\nShort press: navigate"]
-    HW_PD2["Start Button (PD2)\nPress: confirm/start"]
-    HW_PD5["Door Btn (PD5)\nToggle door"]
-    HW_PD6["Water Btn (PD6)\nToggle water"]
-    HW_OLED["OLED SSD1306 (I2C)"]
-    HW_MOTOR["Motor GPIO (PD12)"]
-    HW_INLET["Inlet Valve GPIO (PD13)"]
-    HW_DRAIN["Drain Valve GPIO (PD14)"]
-    HW_LED["Status LED GPIO (PD15)"]
+    HW_BTN[&quot;B1 Button (PA0)\nShort press: navigate&quot;]
+    HW_PD2[&quot;Start Button (PD2)\nPress: confirm/start&quot;]
+    HW_PD5[&quot;Door Btn (PD5)\nToggle door&quot;]
+    HW_PD6[&quot;Water Btn (PD6)\nToggle water&quot;]
+    HW_OLED[&quot;OLED SSD1306 (I2C)&quot;]
+    HW_MOTOR[&quot;Motor GPIO (PD12)&quot;]
+    HW_INLET[&quot;Inlet Valve GPIO (PD13)&quot;]
+    HW_DRAIN[&quot;Drain Valve GPIO (PD14)&quot;]
+    HW_LED[&quot;Status LED GPIO (PD15)&quot;]
 
     %% --- ISR layer ---
-    ISR_BTN["EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce &rarr; NAVIGATE only\n[ISR CONTEXT]"]
-    ISR_PD2["EXTI2_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge &rarr; CONFIRM\n[ISR CONTEXT]"]
-    TMR_CB["Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]"]
+    ISR_BTN[&quot;EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce \u2192 NAVIGATE only\n[ISR CONTEXT]&quot;]
+    ISR_PD2[&quot;EXTI2_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge \u2192 CONFIRM\n[ISR CONTEXT]&quot;]
+    TMR_CB[&quot;Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]&quot;]
 
     %% --- Queue / Event objects ---
-    Q_BTN[("xButtonQueue\n─────────────\nItem: ButtonEvent_t\nDepth: 5\nISR &rarr; UITask")]
-    Q_CMD[("xCommandQueue\n─────────────\nItem: CommandMsg_t\nDepth: 5\nUITask &rarr; WashMgr")]
-    Q_DSP[("xDisplayQueue\n─────────────\nItem: DisplayMsg_t\nDepth: 5\nWashMgr &rarr; OLED")]
-    EG[["xSystemEvents\n─────────────────────\nBit0 EVT_DOOR_CLOSED\nBit1 EVT_WATER_FULL\nBit2 EVT_TIMEOUT\nBit3 EVT_FINISHED\nBit4 EVT_ERROR"]]
+    Q_BTN[(&quot;xButtonQueue\n─────────────\nItem: ButtonEvent_t\nDepth: 5\nISR → UITask&quot;)]
+    Q_CMD[(&quot;xCommandQueue\n─────────────\nItem: CommandMsg_t\nDepth: 5\nUITask → WashMgr&quot;)]
+    Q_DSP[(&quot;xDisplayQueue\n─────────────\nItem: DisplayMsg_t\nDepth: 5\nWashMgr → OLED&quot;)]
+    EG[[&quot;xSystemEvents\n─────────────────────\nBit0 EVT_DOOR_CLOSED\nBit1 EVT_WATER_FULL\nBit2 EVT_TIMEOUT\nBit3 EVT_FINISHED\nBit4 EVT_ERROR&quot;]]
 
     %% --- Timers ---
-    T1[/"xFillTimeoutTimer\nOne-shot 10 s"/]
-    T2[/"xWashTimer\nOne-shot 20 s"/]
-    T3[/"xDrainTimer\nOne-shot 5 s"/]
-    T4[/"xSpinTimer\nOne-shot 10 s"/]
+    T1[/&quot;xFillTimeoutTimer\nOne-shot 10 s&quot;/]
+    T2[/&quot;xWashTimer\nOne-shot 20 s&quot;/]
+    T3[/&quot;xDrainTimer\nOne-shot 5 s&quot;/]
+    T4[/&quot;xSpinTimer\nOne-shot 10 s&quot;/]
 
     %% --- Tasks ---
-    UI["UITask  Prio=2\n─────────────────\nMenu cursor\nButton interpreter"]
-    WASH["WashingManager  Prio=3\n─────────────────\nState machine owner\nActuator control"]
-    SENSOR["SensorTask  Prio=2\n─────────────────\nPoll door + water\nevery 100 ms"]
-    OLED["OLEDTask  Prio=1\n─────────────────\nOnly renderer\nNever blocks others"]
+    UI[&quot;UITask  Prio=2\n─────────────────\nMenu cursor\nButton interpreter&quot;]
+    WASH[&quot;WashingManager  Prio=3\n─────────────────\nState machine owner\nActuator control&quot;]
+    SENSOR[&quot;SensorTask  Prio=2\n─────────────────\nPoll door + water\nevery 100 ms&quot;]
+    OLED[&quot;OLEDTask  Prio=1\n─────────────────\nOnly renderer\nNever blocks others&quot;]
 
     %% --- Connections ---
-    HW_BTN --&gt;|"RISING/FALLING edge"| ISR_BTN
-    ISR_BTN --&gt;|"xQueueSendFromISR\nBTN_EVENT_NAVIGATE"| Q_BTN
-    HW_PD2 --&gt;|"FALLING edge EXTI2"| ISR_PD2
-    ISR_PD2 --&gt;|"xQueueSendFromISR\nBTN_EVENT_CONFIRM"| Q_BTN
-    Q_BTN --&gt;|"xQueueReceive\nblocks"| UI
-    UI --&gt;|"xQueueSend"| Q_CMD
-    UI --&gt;|"xQueueSend\n(cursor move — BTN_EVENT_NAVIGATE)"| Q_DSP
+    HW_BTN --&gt;|&quot;RISING/FALLING edge&quot;| ISR_BTN
+    ISR_BTN --&gt;|&quot;xQueueSendFromISR\nBTN_EVENT_NAVIGATE&quot;| Q_BTN
+    HW_PD2 --&gt;|&quot;FALLING edge EXTI2&quot;| ISR_PD2
+    ISR_PD2 --&gt;|&quot;xQueueSendFromISR\nBTN_EVENT_CONFIRM&quot;| Q_BTN
+    Q_BTN --&gt;|&quot;xQueueReceive\nblocks&quot;| UI
+    UI --&gt;|&quot;xQueueSend&quot;| Q_CMD
+    UI --&gt;|&quot;xQueueSend\n(cursor move — BTN_EVENT_NAVIGATE)&quot;| Q_DSP
 
-    Q_CMD --&gt;|"xQueueReceive\nblocks (IDLE state)"| WASH
-    WASH --&gt;|"xQueueSend"| Q_DSP
-    Q_DSP --&gt;|"xQueueReceive\nblocks"| OLED
-    OLED --&gt;|"I2C write"| HW_OLED
+    Q_CMD --&gt;|&quot;xQueueReceive\nblocks (IDLE state)&quot;| WASH
+    WASH --&gt;|&quot;xQueueSend&quot;| Q_DSP
+    Q_DSP --&gt;|&quot;xQueueReceive\nblocks&quot;| OLED
+    OLED --&gt;|&quot;I2C write&quot;| HW_OLED
 
-    HW_PD5 --&gt;|"Polled 100 ms\nBSP_Sensor_Poll()"| SENSOR
-    HW_PD6 --&gt;|"Polled 100 ms\nBSP_Sensor_Poll()"| SENSOR
-    SENSOR --&gt;|"xEventGroupSetBits\nDOOR_CLOSED / WATER_FULL"| EG
-    SENSOR --&gt;|"xEventGroupSetBits\nEVT_ERROR (door open)"| EG
-    EG --&gt;|"xEventGroupWaitBits\nblocks mid-cycle"| WASH
+    HW_PD5 --&gt;|&quot;Polled 100 ms\nBSP_Sensor_Poll()&quot;| SENSOR
+    HW_PD6 --&gt;|&quot;Polled 100 ms\nBSP_Sensor_Poll()&quot;| SENSOR
+    SENSOR --&gt;|&quot;xEventGroupSetBits\nDOOR_CLOSED / WATER_FULL&quot;| EG
+    SENSOR --&gt;|&quot;xEventGroupSetBits\nEVT_ERROR (door open)&quot;| EG
+    EG --&gt;|&quot;xEventGroupWaitBits\nblocks mid-cycle&quot;| WASH
 
-    WASH --&gt;|"xTimerStart\n(entry action)"| T1 &amp; T2 &amp; T3 &amp; T4
-    T1 &amp; T2 &amp; T3 &amp; T4 --&gt;|"fires callback"| TMR_CB
-    TMR_CB --&gt;|"xEventGroupSetBits\nEVT_TIMEOUT\n(Timer Svc Task, KHÔNG phải ISR)"| EG
-    WASH --&gt;|"xEventGroupSetBits\nEVT_FINISHED / EVT_ERROR"| EG
+    WASH --&gt;|&quot;xTimerStart\n(entry action)&quot;| T1 &amp; T2 &amp; T3 &amp; T4
+    T1 &amp; T2 &amp; T3 &amp; T4 --&gt;|&quot;fires callback&quot;| TMR_CB
+    TMR_CB --&gt;|&quot;xEventGroupSetBits\nEVT_TIMEOUT\n(Timer Svc Task, KHÔNG phải ISR)&quot;| EG
+    WASH --&gt;|&quot;xEventGroupSetBits\nEVT_FINISHED / EVT_ERROR&quot;| EG
 
-    WASH --&gt;|"BSP calls"| HW_MOTOR &amp; HW_INLET &amp; HW_DRAIN &amp; HW_LED
-</pre>
-</div>
-
-<h2 id="sec2">2. State Machine — Tất cả trạng thái và chuyển tiếp</h2>
-
-<div class="diagram">
-<pre class="mermaid">
-stateDiagram-v2
+    WASH --&gt;|&quot;BSP calls&quot;| HW_MOTOR &amp; HW_INLET &amp; HW_DRAIN &amp; HW_LED
+"></figure></div>
+<hr>
+<h2 id="2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp">2. State Machine — Tất cả trạng thái và chuyển tiếp<a class="anchor" href="#2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp" aria-label="Liên kết tới mục này">#</a></h2>
+<div class="dg-slot"><figure class="diagram" data-src="stateDiagram-v2
     [*] --&gt; IDLE : Power on
 
     IDLE --&gt; FILL_WATER : CMD_START_WASH\n[xCommandQueue]
     IDLE --&gt; SPIN       : CMD_START_SPIN\n[xCommandQueue]
 
     FILL_WATER --&gt; WASHING : EVT_WATER_FULL\n[xSystemEvents Bit1]
-    FILL_WATER --&gt; ERROR   : EVT_TIMEOUT (10 s)\n[xFillTimeoutTimer &rarr; Bit2]
+    FILL_WATER --&gt; ERROR   : EVT_TIMEOUT (10 s)\n[xFillTimeoutTimer → Bit2]
     FILL_WATER --&gt; ERROR   : EVT_ERROR\n[xSystemEvents Bit4]
 
-    WASHING --&gt; DRAIN : EVT_TIMEOUT (20 s)\n[xWashTimer &rarr; Bit2]
+    WASHING --&gt; DRAIN : EVT_TIMEOUT (20 s)\n[xWashTimer → Bit2]
     WASHING --&gt; ERROR : EVT_ERROR\n[xSystemEvents Bit4]
 
-    DRAIN --&gt; SPIN  : EVT_TIMEOUT (5 s)\n[xDrainTimer &rarr; Bit2]
+    DRAIN --&gt; SPIN  : EVT_TIMEOUT (5 s)\n[xDrainTimer → Bit2]
     DRAIN --&gt; ERROR : EVT_ERROR\n[xSystemEvents Bit4]
 
-    SPIN --&gt; FINISH : EVT_TIMEOUT (10 s)\n[xSpinTimer &rarr; Bit2]
+    SPIN --&gt; FINISH : EVT_TIMEOUT (10 s)\n[xSpinTimer → Bit2]
     SPIN --&gt; ERROR  : EVT_ERROR\n[xSystemEvents Bit4]
 
     FINISH --&gt; IDLE : CMD_RESET / Start press\n[xCommandQueue / mapped in WashMgr]
@@ -252,16 +411,11 @@ stateDiagram-v2
         xSpinTimer starts
         blocks: EVT_TIMEOUT | EVT_ERROR
     end note
-</pre>
-</div>
-
-<h2 id="sec3">3. Kịch bản A — Full Wash Cycle (Bình thường)</h2>
-
-<p><strong>Trigger:</strong> User nhấn PD2 (Start button) khi cursor ở "Wash"</p>
-
-<div class="diagram">
-<pre class="mermaid">
-sequenceDiagram
+"></figure></div>
+<hr>
+<h2 id="3-kịch-bản-a--full-wash-cycle-bình-thường">3. Kịch bản A — Full Wash Cycle (Bình thường)<a class="anchor" href="#3-kịch-bản-a--full-wash-cycle-bình-thường" aria-label="Liên kết tới mục này">#</a></h2>
+<p><strong>Trigger:</strong> User nhấn PD2 (Start button) khi cursor ở &quot;Wash&quot;</p>
+<div class="dg-slot"><figure class="diagram" data-src="sequenceDiagram
     actor User
     participant ISR0 as EXTI0 ISR (PA0)
     participant ISR1 as EXTI2 ISR (PD2)
@@ -272,21 +426,21 @@ sequenceDiagram
     participant OLED as OLEDTask
 
     Note over User,OLED: ── Khởi động ──
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "IDLE")&lt;br/&gt;menuIndex=0
-    OLED-&gt;&gt;OLED: Render: title + Wash/Spin menu + "IDLE"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)&lt;br/&gt;menuIndex=0
+    OLED-&gt;&gt;OLED: Render: title + Wash/Spin menu + &quot;IDLE&quot;
 
-    Note over User,OLED: ── User điều hướng menu (nhấn PA0) ──
+    Note over User,OLED: ── User điều hướng menu (short press PA0) ──
     User-&gt;&gt;ISR0: Nhấn nhanh PA0
     ISR0-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
     UI-&gt;&gt;UI: menuIndex = 1 (Spin)
-    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=1 "IDLE")
-    OLED-&gt;&gt;OLED: Render: cursor trên "Spin"
+    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=1 &quot;IDLE&quot;)
+    OLED-&gt;&gt;OLED: Render: cursor trên &quot;Spin&quot;
 
     User-&gt;&gt;ISR0: Nhấn nhanh PA0 lần 2
     ISR0-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
     UI-&gt;&gt;UI: menuIndex = 0 (Wash)
-    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=0 "IDLE")
-    OLED-&gt;&gt;OLED: Render: cursor trở về "Wash"
+    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=0 &quot;IDLE&quot;)
+    OLED-&gt;&gt;OLED: Render: cursor trở về &quot;Wash&quot;
 
     Note over User,OLED: ── User xác nhận (nhấn PD2) ──
     User-&gt;&gt;ISR1: Nhấn PD2 (Start button)
@@ -297,8 +451,8 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: SM: IDLE → FILL_WATER
     WASH-&gt;&gt;WASH: BSP_Valve_Open(INLET) + BSP_LED_On()
     WASH-&gt;&gt;WASH: xTimerStart(xFillTimeoutTimer, 10 s)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "FILL WATER")
-    OLED-&gt;&gt;OLED: Render "FILL WATER"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;FILL WATER&quot;)
+    OLED-&gt;&gt;OLED: Render &quot;FILL WATER&quot;
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_WATER_FULL|EVT_TIMEOUT|EVT_ERROR)
     Note right of WASH: BLOCKED — waiting for water
@@ -316,20 +470,20 @@ sequenceDiagram
     Note over User,OLED: ── WASHING phase ──
     WASH-&gt;&gt;WASH: BSP_Valve_Close(INLET) + BSP_Motor_Start()
     WASH-&gt;&gt;WASH: xTimerStart(xWashTimer, 20 s)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "WASHING")
-    OLED-&gt;&gt;OLED: Render "WASHING"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;WASHING&quot;)
+    OLED-&gt;&gt;OLED: Render &quot;WASHING&quot;
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_TIMEOUT|EVT_ERROR)
     Note right of WASH: BLOCKED — waiting 20 s
 
-    TMR--&gt;&gt;WASH: xWashTimer fires → xEventGroupSetBits(EVT_TIMEOUT)<br/>(Timer Service Task context, không phải ISR)
+    TMR--&gt;&gt;WASH: xWashTimer fires → xEventGroupSetBits(EVT_TIMEOUT)&lt;br/&gt;(Timer Service Task context, không phải ISR)
     WASH-&gt;&gt;WASH: Unblocked: EVT_TIMEOUT
     WASH-&gt;&gt;WASH: SM: WASHING → DRAIN
 
     Note over User,OLED: ── DRAIN phase ──
     WASH-&gt;&gt;WASH: BSP_Motor_Stop() + BSP_Valve_Open(DRAIN)
     WASH-&gt;&gt;WASH: xTimerStart(xDrainTimer, 5 s)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "DRAIN")
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;DRAIN&quot;)
 
     TMR--&gt;&gt;WASH: xDrainTimer fires → EVT_TIMEOUT
     WASH-&gt;&gt;WASH: SM: DRAIN → SPIN
@@ -337,7 +491,7 @@ sequenceDiagram
     Note over User,OLED: ── SPIN phase ──
     WASH-&gt;&gt;WASH: BSP_Valve_Close(DRAIN) + BSP_Motor_Start()
     WASH-&gt;&gt;WASH: xTimerStart(xSpinTimer, 10 s)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "SPINNING")
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;SPINNING&quot;)
 
     TMR--&gt;&gt;WASH: xSpinTimer fires → EVT_TIMEOUT
     WASH-&gt;&gt;WASH: SM: SPIN → FINISH
@@ -346,8 +500,8 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: BSP_Motor_Stop() + BSP_LED_Off()
     WASH-&gt;&gt;WASH: xEventGroupSetBits(EVT_FINISHED)
     WASH-&gt;&gt;WASH: xQueueReset(xCommandQueue) (clear stale commands)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "FINISHED")
-    OLED-&gt;&gt;OLED: Render "FINISHED"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;FINISHED&quot;)
+    OLED-&gt;&gt;OLED: Render &quot;FINISHED&quot;
 
     Note over User,OLED: ── User acknowledge (nhấn PD2) ──
     User-&gt;&gt;ISR1: Nhấn PD2
@@ -355,17 +509,12 @@ sequenceDiagram
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: FINISH → IDLE
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "IDLE")
-</pre>
-</div>
-
-<h2 id="sec4">4. Kịch bản B — Spin-Only Cycle</h2>
-
-<p><strong>Trigger:</strong> User nhấn PD2 (Start) khi cursor ở "Spin"</p>
-
-<div class="diagram">
-<pre class="mermaid">
-sequenceDiagram
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
+"></figure></div>
+<hr>
+<h2 id="4-kịch-bản-b--spin-only-cycle">4. Kịch bản B — Spin-Only Cycle<a class="anchor" href="#4-kịch-bản-b--spin-only-cycle" aria-label="Liên kết tới mục này">#</a></h2>
+<p><strong>Trigger:</strong> User nhấn PD2 (Start) khi cursor ở &quot;Spin&quot;</p>
+<div class="dg-slot"><figure class="diagram" data-src="sequenceDiagram
     actor User
     participant ISR1 as EXTI2 ISR (PD2)
     participant UI   as UITask
@@ -377,12 +526,12 @@ sequenceDiagram
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_SPIN, WASH_MODE_SPIN, menuIndex=1)
 
-    Note over WASH: SM: IDLE → SPIN<br/>(skip FILL_WATER, WASHING, DRAIN)
+    Note over WASH: SM: IDLE → SPIN&lt;br/&gt;(skip FILL_WATER, WASHING, DRAIN)
 
     WASH-&gt;&gt;WASH: BSP_Valve_Close(DRAIN) + BSP_Motor_Start()
     WASH-&gt;&gt;WASH: xTimerStart(xSpinTimer, 10 s)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "SPINNING")
-    OLED-&gt;&gt;OLED: Render "SPINNING"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;SPINNING&quot;)
+    OLED-&gt;&gt;OLED: Render &quot;SPINNING&quot;
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_TIMEOUT | EVT_ERROR)
     Note right of WASH: BLOCKED 10 s
@@ -391,24 +540,19 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: SM: SPIN → FINISH
     WASH-&gt;&gt;WASH: BSP_Motor_Stop()
     WASH-&gt;&gt;WASH: xEventGroupSetBits(EVT_FINISHED)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "FINISHED")
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;FINISHED&quot;)
 
     User-&gt;&gt;ISR1: Nhấn PD2
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
     WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: FINISH → IDLE
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "IDLE")
-</pre>
-</div>
-
-<h2 id="sec5">5. Kịch bản C — Error: Cửa Mở Giữa Chu Trình</h2>
-
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
+"></figure></div>
+<hr>
+<h2 id="5-kịch-bản-c--error-cửa-mở-giữa-chu-trình">5. Kịch bản C — Error: Cửa Mở Giữa Chu Trình<a class="anchor" href="#5-kịch-bản-c--error-cửa-mở-giữa-chu-trình" aria-label="Liên kết tới mục này">#</a></h2>
 <p><strong>Trigger:</strong> SensorTask phát hiện cửa mở khi đang chạy</p>
-
-<div class="diagram">
-<pre class="mermaid">
-sequenceDiagram
+<div class="dg-slot"><figure class="diagram" data-src="sequenceDiagram
     participant SENS as SensorTask
     participant EG   as xSystemEvents
     participant WASH as WashingManager
@@ -436,8 +580,8 @@ sequenceDiagram
     WASH-&gt;&gt;WASH: BSP_LED_Off()
     WASH-&gt;&gt;EG: xEventGroupSetBits(EVT_ERROR)
     WASH-&gt;&gt;WASH: xQueueReset(xCommandQueue) (clear stale commands)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "ERROR")
-    OLED-&gt;&gt;OLED: Render "ERROR"
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;ERROR&quot;)
+    OLED-&gt;&gt;OLED: Render &quot;ERROR&quot;
 
     Note over WASH: SM blocks on xCommandQueue — chờ lệnh bất kỳ từ UITask
     WASH-&gt;&gt;WASH: xQueueReceive(xCommandQueue, portMAX_DELAY)
@@ -446,38 +590,33 @@ sequenceDiagram
     actor User
     User-&gt;&gt;UI: Nhấn PD2 → BTN_EVENT_CONFIRM
     UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN, menuIndex)
-    Note right of WASH: UITask KHÔNG có khái niệm CMD_RESET —<br/>luôn gửi START_WASH/START_SPIN theo menuIndex
+    Note right of WASH: UITask KHÔNG có khái niệm CMD_RESET —&lt;br/&gt;luôn gửi START_WASH/START_SPIN theo menuIndex
     WASH-&gt;&gt;WASH: Check state (ERROR) → map bất kỳ command nào thành WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: ERROR → IDLE
     WASH-&gt;&gt;EG: xEventGroupClearBits(EVT_FINISHED | EVT_ERROR)
-    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg "IDLE")
-</pre>
-</div>
-
-<h2 id="sec6">6. Kịch bản D — Fill Timeout (Nước Không Lên)</h2>
-
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
+"></figure></div>
+<hr>
+<h2 id="6-kịch-bản-d--fill-timeout-nước-không-lên">6. Kịch bản D — Fill Timeout (Nước Không Lên)<a class="anchor" href="#6-kịch-bản-d--fill-timeout-nước-không-lên" aria-label="Liên kết tới mục này">#</a></h2>
 <p><strong>Trigger:</strong> Nước không đạt mức trong 10 giây</p>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart TD
+<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
     A([IDLE]) --&gt;|CMD_START_WASH| B
 
-    B["onEnterFillWater()\n──────────────────\nBSP_Valve_Open INLET\nBSP_LED_On\nxTimerStart xFillTimeoutTimer 10s"]
+    B[&quot;onEnterFillWater()\n──────────────────\nBSP_Valve_Open INLET\nBSP_LED_On\nxTimerStart xFillTimeoutTimer 10s&quot;]
 
-    B --&gt; C{"xEventGroupWaitBits\nEVT_WATER_FULL\nEVT_TIMEOUT\nEVT_ERROR\n[BLOCKED]"}
+    B --&gt; C{&quot;xEventGroupWaitBits\nEVT_WATER_FULL\nEVT_TIMEOUT\nEVT_ERROR\n[BLOCKED]&quot;}
 
-    C --&gt;|"EVT_WATER_FULL\n(bình thường)"| D["xTimerStop(xFillTimeoutTimer)\nSM → WASHING"]
+    C --&gt;|&quot;EVT_WATER_FULL\n(bình thường)&quot;| D[&quot;xTimerStop(xFillTimeoutTimer)\nSM → WASHING&quot;]
 
-    C --&gt;|"EVT_TIMEOUT\n(10s, nước không lên)"| E["SM → ERROR\nTIMEOUT path"]
+    C --&gt;|&quot;EVT_TIMEOUT\n(10s, nước không lên)&quot;| E[&quot;SM → ERROR\nTIMEOUT path&quot;]
 
-    C --&gt;|"EVT_ERROR\n(cửa mở)"| F["xTimerStop(xFillTimeoutTimer)\nSM → ERROR"]
+    C --&gt;|&quot;EVT_ERROR\n(cửa mở)&quot;| F[&quot;xTimerStop(xFillTimeoutTimer)\nSM → ERROR&quot;]
 
     D --&gt; G([WASHING])
     E --&gt; H([ERROR])
     F --&gt; H
 
-    H --&gt; I{"xQueueReceive\nxCommandQueue\n[BLOCKED]"}
+    H --&gt; I{&quot;xQueueReceive\nxCommandQueue\n[BLOCKED]&quot;}
     I --&gt;|CMD_RESET| J([IDLE])
 
     style B fill:#1b4332,stroke:#2ea043,color:#ffffff
@@ -486,134 +625,115 @@ flowchart TD
     style D fill:#1b4332,stroke:#2ea043,color:#ffffff
     style E fill:#5c1d24,stroke:#f85149,color:#ffffff
     style F fill:#5c1d24,stroke:#f85149,color:#ffffff
-</pre>
-</div>
+"></figure></div>
+<hr>
+<h2 id="7-button-press-flow--từ-phần-cứng-đến-state-machine">7. Button Press Flow — Từ Phần Cứng Đến State Machine<a class="anchor" href="#7-button-press-flow--từ-phần-cứng-đến-state-machine" aria-label="Liên kết tới mục này">#</a></h2>
+<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
+    PA0([&quot;PA0 — B1 Button\nNavigate menu&quot;])
+    PD2([&quot;PD2 — Start Button\nConfirm / Start&quot;])
 
-<h2 id="sec7">7. Button Press Flow — Từ Phần Cứng Đến State Machine</h2>
+    PA0 --&gt;|&quot;RISING edge → record time\nFALLING edge → measure duration&quot;| ISR0
 
-<div class="diagram">
-<pre class="mermaid">
-flowchart TD
-    PA0(["PA0 — B1 Button\nNavigate menu"])
-    PD2(["PD2 — Start Button\nConfirm / Start"])
+    ISR0[&quot;EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nduration = HAL_GetTick() - s_pressStartMs&quot;]
 
-    PA0 --&gt;|"RISING edge &rarr; record time\nFALLING edge &rarr; measure duration"| ISR0
+    ISR0 --&gt; DEB{&quot;duration &lt; 50ms?&quot;}
+    DEB --&gt;|YES| NOISE[&quot;Noise — ignore&quot;]
+    DEB --&gt;|NO = Navigate| S_SEND[&quot;xQueueSendFromISR\n(BTN_EVENT_NAVIGATE)\n+ portYIELD_FROM_ISR&quot;]
 
-    ISR0["EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nduration = HAL_GetTick() - s_pressStartMs"]
+    PD2 --&gt;|&quot;FALLING edge (press)&quot;| ISR1
 
-    ISR0 --&gt; DEB{"duration &lt; 50ms?"}
-    DEB --&gt;|YES| NOISE["Noise — ignore"]
-    DEB --&gt;|NO = Navigate| S_SEND["xQueueSendFromISR\n(BTN_EVENT_NAVIGATE)\n+ portYIELD_FROM_ISR"]
+    ISR1[&quot;EXTI2_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press&quot;]
 
-    PD2 --&gt;|"FALLING edge (press)"| ISR1
-
-    ISR1["EXTI2_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press"]
-
-    ISR1 --&gt; L_SEND["xQueueSendFromISR\n(BTN_EVENT_CONFIRM)\n+ portYIELD_FROM_ISR"]
+    ISR1 --&gt; L_SEND[&quot;xQueueSendFromISR\n(BTN_EVENT_CONFIRM)\n+ portYIELD_FROM_ISR&quot;]
 
     L_SEND --&gt; UI_RECV
     S_SEND --&gt; UI_RECV
 
-    UI_RECV["UITask\nxQueueReceive\n(blocks until event)"]
+    UI_RECV[&quot;UITask\nxQueueReceive\n(blocks until event)&quot;]
 
-    UI_RECV --&gt;|BTN_EVENT_NAVIGATE| CURSOR["menuIndex++\n% MENU_ITEM_COUNT\n────────────────────\nxQueueSend(xDisplayQueue)\n{ menuIndex, s_statusCache }"]
+    UI_RECV --&gt;|BTN_EVENT_NAVIGATE| CURSOR[&quot;menuIndex++\n% MENU_ITEM_COUNT\n────────────────────\nxQueueSend(xDisplayQueue)\n{ menuIndex, s_statusCache }&quot;]
 
-    UI_RECV --&gt;|BTN_EVENT_CONFIRM| CMD_BUILD{"menuIndex == 0?"}
+    UI_RECV --&gt;|BTN_EVENT_CONFIRM| CMD_BUILD{&quot;menuIndex == 0?&quot;}
 
-    CMD_BUILD --&gt;|"YES (Wash)"| WASH_CMD["cmd = { CMD_START_WASH\nWASH_MODE_WASH\nmenuIndex }"]
-    CMD_BUILD --&gt;|"NO (Spin)"| SPIN_CMD["cmd = { CMD_START_SPIN\nWASH_MODE_SPIN\nmenuIndex }"]
+    CMD_BUILD --&gt;|&quot;YES (Wash)&quot;| WASH_CMD[&quot;cmd = { CMD_START_WASH\nWASH_MODE_WASH\nmenuIndex }&quot;]
+    CMD_BUILD --&gt;|&quot;NO (Spin)&quot;| SPIN_CMD[&quot;cmd = { CMD_START_SPIN\nWASH_MODE_SPIN\nmenuIndex }&quot;]
 
-    WASH_CMD --&gt; SEND_CMD["xQueueSend(xCommandQueue)"]
+    WASH_CMD --&gt; SEND_CMD[&quot;xQueueSend(xCommandQueue)&quot;]
     SPIN_CMD --&gt; SEND_CMD
 
-    SEND_CMD --&gt; MGR["WashingManager\nxQueueReceive(xCommandQueue)\nManager_HandleCommand()"]
+    SEND_CMD --&gt; MGR[&quot;WashingManager\nxQueueReceive(xCommandQueue)\nManager_HandleCommand()&quot;]
 
-    MGR --&gt;|CMD_START_WASH| SM_W["WashingSM_ProcessEvent\n(WASH_EVT_START_WASH)\n→ IDLE → FILL_WATER"]
-    MGR --&gt;|CMD_START_SPIN| SM_S["WashingSM_ProcessEvent\n(WASH_EVT_START_SPIN)\n→ IDLE → SPIN"]
+    MGR --&gt;|CMD_START_WASH| SM_W[&quot;WashingSM_ProcessEvent\n(WASH_EVT_START_WASH)\n→ IDLE → FILL_WATER&quot;]
+    MGR --&gt;|CMD_START_SPIN| SM_S[&quot;WashingSM_ProcessEvent\n(WASH_EVT_START_SPIN)\n→ IDLE → SPIN&quot;]
 
-    CURSOR --&gt; OLED_UPD["OLEDTask\nxQueueReceive(xDisplayQueue)\nRender cursor move"]
+    CURSOR --&gt; OLED_UPD[&quot;OLEDTask\nxQueueReceive(xDisplayQueue)\nRender cursor move&quot;]
 
     style NOISE fill:#5c1d24,stroke:#f85149,color:#ffffff
     style L_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
     style S_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
     style CURSOR fill:#1b4332,stroke:#2ea043,color:#ffffff
     style SEND_CMD fill:#0d3b66,stroke:#388bfd,color:#ffffff
-</pre>
-</div>
-
-<h2 id="sec8">8. Software Timer Flow — Cách Timer Lái State Machine</h2>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart LR
-    subgraph WashMgr["WashingManager Task (Prio=3)"]
+"></figure></div>
+<hr>
+<h2 id="8-software-timer-flow--cách-timer-lái-state-machine">8. Software Timer Flow — Cách Timer Lái State Machine<a class="anchor" href="#8-software-timer-flow--cách-timer-lái-state-machine" aria-label="Liên kết tới mục này">#</a></h2>
+<div class="dg-slot"><figure class="diagram" data-src="flowchart LR
+    subgraph WashMgr[&quot;WashingManager Task (Prio=3)&quot;]
         direction TB
-        ENA["xTimerStart(xWashTimer, 20s)\ncalled from onEnterWashing()"]
-        WAIT_T["xEventGroupWaitBits\n(EVT_TIMEOUT | EVT_ERROR)\nBLOCKED"]
-        PROC["WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\n→ WASHING → DRAIN"]
+        ENA[&quot;xTimerStart(xWashTimer, 20s)\ncalled from onEnterWashing()&quot;]
+        WAIT_T[&quot;xEventGroupWaitBits\n(EVT_TIMEOUT | EVT_ERROR)\nBLOCKED&quot;]
+        PROC[&quot;WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\n→ WASHING → DRAIN&quot;]
     end
 
-    subgraph TimerSvc["Timer Service Task (Prio=2, internal FreeRTOS)"]
+    subgraph TimerSvc[&quot;Timer Service Task (Prio=2, internal FreeRTOS)&quot;]
         direction TB
-        COUNT["Tick counter\n20000 ms elapsed"]
-        CB["Timer_PhaseCallback()\ncalled by Timer Service Task\n─────────────────────\n(void)xTimer;\nxEventGroupSetBits(EVT_TIMEOUT)"]
+        COUNT[&quot;Tick counter\n20000 ms elapsed&quot;]
+        CB[&quot;Timer_PhaseCallback()\ncalled by Timer Service Task\n─────────────────────\n(void)xTimer;\nxEventGroupSetBits(EVT_TIMEOUT)&quot;]
     end
 
-    subgraph EvtGrp["xSystemEvents (shared)"]
-        BIT["Bit2: EVT_TIMEOUT\n0 → 1"]
+    subgraph EvtGrp[&quot;xSystemEvents (shared)&quot;]
+        BIT[&quot;Bit2: EVT_TIMEOUT\n0 → 1&quot;]
     end
 
-    ENA --&gt;|"posts timer command\nto timer queue"| COUNT
-    COUNT --&gt;|"calls callback"| CB
-    CB --&gt;|"xEventGroupSetBits (plain, KHÔNG phải FromISR)\nTimer Svc Task là task thật, không phải ISR"| BIT
-    BIT --&gt;|"unblocks WashingManager\nif waiting on EVT_TIMEOUT"| WAIT_T
+    ENA --&gt;|&quot;posts timer command\nto timer queue&quot;| COUNT
+    COUNT --&gt;|&quot;calls callback&quot;| CB
+    CB --&gt;|&quot;xEventGroupSetBits (plain, KHÔNG phải FromISR)\nTimer Svc Task là task thật, không phải ISR&quot;| BIT
+    BIT --&gt;|&quot;unblocks WashingManager\nif waiting on EVT_TIMEOUT&quot;| WAIT_T
     WAIT_T --&gt; PROC
-    PROC --&gt;|"onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)"| ENA
+    PROC --&gt;|&quot;onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)&quot;| ENA
 
     style CB fill:#4a3b00,stroke:#d4a72c,color:#ffffff
     style BIT fill:#1b4332,stroke:#2ea043,color:#ffffff
     style WAIT_T fill:#0d3b66,stroke:#388bfd,color:#ffffff
-</pre>
-</div>
-
-<h2 id="sec9">9. Task Blocking Map — Mỗi Task Đang Chờ Gì</h2>
-
-<p>Bảng này dùng để debug: nếu chương trình treo, xem task nào đang block và tại sao.</p>
-
-<div class="diagram">
-<pre class="mermaid">
-flowchart TD
-    subgraph "Trong mỗi phase, WashingManager block tại:"
-        IDLE_B["STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PD2 (Start/Confirm)"]
-
-        FILL_B["STATE: FILL_WATER\n──────────────────────\nxEventGroupWaitBits\n(EVT_WATER_FULL OR EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ sensor OR timer 10s OR cửa mở"]
-
-        WASH_B["STATE: WASHING\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 20s OR cửa mở"]
-
-        DRAIN_B["STATE: DRAIN\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 5s OR cửa mở"]
-
-        SPIN_B["STATE: SPIN\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 10s OR cửa mở"]
-    end
-
-    subgraph "Các task còn lại luôn block tại:"
-        UI_B["UITask\n──────────────────────\nxQueueReceive(xButtonQueue)\nportMAX_DELAY\n─\nChờ button press"]
-
-        SENS_B["SensorTask\n──────────────────────\nvTaskDelay(100ms)\n─\nPeriodic poll (không block event)"]
-
-        OLED_B["OLEDTask\n──────────────────────\nxQueueReceive(xDisplayQueue)\nportMAX_DELAY\n─\nChờ display message"]
-    end
-</pre>
-</div>
-
-<p><strong>Debug tip:</strong> Nếu màn hình không update → OLEDTask đang chờ message ở xDisplayQueue. Kiểm tra WashingManager có gọi <code>Manager_PostDisplay()</code> không.</p>
-
-<p><strong>Debug tip:</strong> Nếu machine không start khi nhấn PD2 → kiểm tra theo thứ tự: (1) <code>Freertos.ioc</code>/<code>main.c</code> — <code>MX_GPIO_Init()</code> có <code>HAL_NVIC_EnableIRQ(EXTI2_IRQn)</code> với priority 5 không; (2) <code>EXTI2_IRQHandler()</code> trong <code>stm32f4xx_it.c</code> có thực sự gọi <code>BSP_StartButton_IRQHandler()</code> trong <code>USER CODE BEGIN EXTI2_IRQn 0</code> không (từng bị thiếu dòng này — xem HARDWARE_BUGS.md § Bug #11). GPIO/NVIC của PA0 và PD2 hiện do CubeMX generate hoàn toàn — không còn hàm <code>BSP_Button_Init()</code>/<code>BSP_StartButton_Init()</code> nữa; <code>ui_task.c</code> chỉ gọi <code>BSP_Button_RegisterCallback()</code>.</p>
-
+"></figure></div>
 <hr>
+<h2 id="9-task-blocking-map--mỗi-task-đang-chờ-gì">9. Task Blocking Map — Mỗi Task Đang Chờ Gì<a class="anchor" href="#9-task-blocking-map--mỗi-task-đang-chờ-gì" aria-label="Liên kết tới mục này">#</a></h2>
+<p>Bảng này dùng để debug: nếu chương trình treo, xem task nào đang block và tại sao.</p>
+<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
+    subgraph &quot;Trong mỗi phase, WashingManager block tại:&quot;
+        IDLE_B[&quot;STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PD2 (Start/Confirm)&quot;]
 
-<h2 id="sec10">10. OLED Screen Layout</h2>
+        FILL_B[&quot;STATE: FILL_WATER\n──────────────────────\nxEventGroupWaitBits\n(EVT_WATER_FULL OR EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ sensor OR timer 10s OR cửa mở&quot;]
 
-<pre class="ascii"><code>Pixel coordinates: x=0..127 (left→right), y=0..63 (top→bottom)
+        WASH_B[&quot;STATE: WASHING\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 20s OR cửa mở&quot;]
+
+        DRAIN_B[&quot;STATE: DRAIN\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 5s OR cửa mở&quot;]
+
+        SPIN_B[&quot;STATE: SPIN\n──────────────────────\nxEventGroupWaitBits\n(EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ timer 10s OR cửa mở&quot;]
+    end
+
+    subgraph &quot;Các task còn lại luôn block tại:&quot;
+        UI_B[&quot;UITask\n──────────────────────\nxQueueReceive(xButtonQueue)\nportMAX_DELAY\n─\nChờ button press&quot;]
+
+        SENS_B[&quot;SensorTask\n──────────────────────\nvTaskDelay(100ms)\n─\nPeriodic poll (không block event)&quot;]
+
+        OLED_B[&quot;OLEDTask\n──────────────────────\nxQueueReceive(xDisplayQueue)\nportMAX_DELAY\n─\nChờ display message&quot;]
+    end
+"></figure></div>
+<p><strong>Debug tip:</strong> Nếu màn hình không update → OLEDTask đang chờ message ở xDisplayQueue. Kiểm tra WashingManager có gọi <code>Manager_PostDisplay()</code> không.</p>
+<p><strong>Debug tip:</strong> Nếu machine không start khi nhấn PD2 → kiểm tra theo thứ tự: (1) <code>Freertos.ioc</code>/<code>main.c</code> — <code>MX_GPIO_Init()</code> có <code>HAL_NVIC_EnableIRQ(EXTI2_IRQn)</code> với priority 5 không; (2) <code>EXTI2_IRQHandler()</code> trong <code>stm32f4xx_it.c</code> có thực sự gọi <code>BSP_StartButton_IRQHandler()</code> trong <code>USER CODE BEGIN EXTI2_IRQn 0</code> không (từng bị thiếu dòng này — xem <a href="HARDWARE_BUGS.md#bug-11--pe1-startconfirm-ch%E1%BA%BFt-ho%C3%A0n-to%C3%A0n-qu%C3%AAn-g%E1%BB%8Di-irq-handler">HARDWARE_BUGS.md § Bug #11</a>). GPIO/NVIC của PA0 và PD2 hiện do CubeMX generate hoàn toàn — không còn hàm <code>BSP_Button_Init()</code>/<code>BSP_StartButton_Init()</code> nữa; <code>ui_task.c</code> chỉ gọi <code>BSP_Button_RegisterCallback()</code>.</p>
+<hr>
+<h2 id="10-oled-screen-layout">10. OLED Screen Layout<a class="anchor" href="#10-oled-screen-layout" aria-label="Liên kết tới mục này">#</a></h2>
+<pre class="code" data-lang=""><code class="hljs">Pixel coordinates: x=0..127 (left→right), y=0..63 (top→bottom)
 Font: 6×8 px per character → 21 chars/row, 8 rows max
 
 ┌────────────────────────────────────────────┐  y=0
@@ -640,39 +760,491 @@ Owner phân quyền:
 </code></pre>
 
 <hr>
-
-<h2 id="sec11">11. FreeRTOS Object Summary</h2>
-
-<table>
-  <thead>
-    <tr>
-      <th>Object</th><th>Type</th><th>Depth/Bits</th><th>Producer</th><th>Consumer</th><th>Mechanism</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td><code>xButtonQueue</code></td><td>Queue</td><td>5 items</td><td>ISR EXTI0 (PA0) + ISR EXTI2 (PD2)</td><td>UITask</td><td><code>xQueueSendFromISR</code> / <code>xQueueReceive</code></td></tr>
-    <tr><td><code>xCommandQueue</code></td><td>Queue</td><td>5 items</td><td>UITask</td><td>WashingManager</td><td><code>xQueueSend</code> / <code>xQueueReceive</code></td></tr>
-    <tr><td><code>xDisplayQueue</code></td><td>Queue</td><td>5 items</td><td>WashingManager, UITask</td><td>OLEDTask</td><td><code>xQueueSend</code> / <code>xQueueReceive</code></td></tr>
-    <tr><td><code>xSystemEvents</code></td><td>Event Group</td><td>5 bits</td><td>SensorTask, TimerCb, WashMgr</td><td>WashingManager</td><td><code>xEventGroupSetBits</code> / <code>xEventGroupWaitBits</code></td></tr>
-    <tr><td><code>xFillTimeoutTimer</code></td><td>SW Timer</td><td>One-shot 10 s</td><td>WashingManager</td><td>TimerServiceTask</td><td><code>xTimerStart</code> / callback</td></tr>
-    <tr><td><code>xWashTimer</code></td><td>SW Timer</td><td>One-shot 20 s</td><td>WashingManager</td><td>TimerServiceTask</td><td><code>xTimerStart</code> / callback</td></tr>
-    <tr><td><code>xDrainTimer</code></td><td>SW Timer</td><td>One-shot 5 s</td><td>WashingManager</td><td>TimerServiceTask</td><td><code>xTimerStart</code> / callback</td></tr>
-    <tr><td><code>xSpinTimer</code></td><td>SW Timer</td><td>One-shot 10 s</td><td>WashingManager</td><td>TimerServiceTask</td><td><code>xTimerStart</code> / callback</td></tr>
-  </tbody>
-</table>
-
+<h2 id="11-freertos-object-summary">11. FreeRTOS Object Summary<a class="anchor" href="#11-freertos-object-summary" aria-label="Liên kết tới mục này">#</a></h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Object</th>
+<th>Type</th>
+<th>Depth/Bits</th>
+<th>Producer</th>
+<th>Consumer</th>
+<th>Mechanism</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>xButtonQueue</code></td>
+<td>Queue</td>
+<td>5 items</td>
+<td>ISR EXTI0 (PA0) + ISR EXTI2 (PD2)</td>
+<td>UITask</td>
+<td><code>xQueueSendFromISR</code> / <code>xQueueReceive</code></td>
+</tr>
+<tr>
+<td><code>xCommandQueue</code></td>
+<td>Queue</td>
+<td>5 items</td>
+<td>UITask</td>
+<td>WashingManager</td>
+<td><code>xQueueSend</code> / <code>xQueueReceive</code></td>
+</tr>
+<tr>
+<td><code>xDisplayQueue</code></td>
+<td>Queue</td>
+<td>5 items</td>
+<td>WashingManager, UITask</td>
+<td>OLEDTask</td>
+<td><code>xQueueSend</code> / <code>xQueueReceive</code></td>
+</tr>
+<tr>
+<td><code>xSystemEvents</code></td>
+<td>Event Group</td>
+<td>5 bits</td>
+<td>SensorTask, TimerCb, WashMgr</td>
+<td>WashingManager</td>
+<td><code>xEventGroupSetBits</code> / <code>xEventGroupWaitBits</code></td>
+</tr>
+<tr>
+<td><code>xFillTimeoutTimer</code></td>
+<td>SW Timer</td>
+<td>One-shot 10 s</td>
+<td>WashingManager</td>
+<td>TimerServiceTask</td>
+<td><code>xTimerStart</code> / callback</td>
+</tr>
+<tr>
+<td><code>xWashTimer</code></td>
+<td>SW Timer</td>
+<td>One-shot 20 s</td>
+<td>WashingManager</td>
+<td>TimerServiceTask</td>
+<td><code>xTimerStart</code> / callback</td>
+</tr>
+<tr>
+<td><code>xDrainTimer</code></td>
+<td>SW Timer</td>
+<td>One-shot 5 s</td>
+<td>WashingManager</td>
+<td>TimerServiceTask</td>
+<td><code>xTimerStart</code> / callback</td>
+</tr>
+<tr>
+<td><code>xSpinTimer</code></td>
+<td>SW Timer</td>
+<td>One-shot 10 s</td>
+<td>WashingManager</td>
+<td>TimerServiceTask</td>
+<td><code>xTimerStart</code> / callback</td>
+</tr>
+</tbody>
+</table></div>
 <p><strong>Không có Mutex/Semaphore trong project hiện tại:</strong></p>
 <ul>
-  <li>OLED access: chỉ có OLEDTask mới gọi BSP_OLED_* → không cần mutex</li>
-  <li>State machine: chỉ có WashingManager mới gọi WashingSM_* → không cần mutex</li>
-  <li>Sensor data: SensorTask write, WashingManager read qua Event Group (atomic) → không cần mutex</li>
+<li>OLED access: chỉ có OLEDTask mới gọi BSP_OLED_* → không cần mutex</li>
+<li>State machine: chỉ có WashingManager mới gọi WashingSM_* → không cần mutex</li>
+<li>Sensor data: SensorTask write, WashingManager read qua Event Group (atomic) → không cần mutex</li>
 </ul>
 
-</main>
+    <footer class="doc-footer">
+      Sinh tự động từ <code>docs/SYSTEM_DIAGRAMS.md</code>. Sửa file <code>.md</code> rồi chạy
+      <code>npm run build</code> trong <code>tools/</code> — đừng sửa tay file này.
+    </footer>
+  </main>
+</div>
+<script>
+/* ==========================================================================
+   Doc viewer script — inlined into every generated page by build_docs.mjs.
+   Responsibilities: theme toggle, TOC highlighting, Mermaid rendering and the
+   zoom / pan / fullscreen controls around each diagram.
+   ========================================================================== */
+(function () {
+  'use strict';
 
-<script type="module">
-  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true, theme: "default", securityLevel: "loose" });
+  var MERMAID_URL = 'https://cdn.jsdelivr.net/npm/mermaid@10.9.8/dist/mermaid.esm.min.mjs';
+  var MAX_ZOOM = 8;
+  var MIN_ZOOM = 0.1;
+  var STEP = 1.25;
+
+  function $(sel, root) { return (root || document).querySelector(sel); }
+  function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function isDark() { return document.documentElement.dataset.theme === 'dark'; }
+
+  /* ------------------------------------------------------------------------
+     Theme
+     ------------------------------------------------------------------------ */
+  var themeListeners = [];
+  $('.theme-toggle').addEventListener('click', function () {
+    var next = isDark() ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('doc-theme', next); } catch (e) { /* private mode */ }
+    themeListeners.forEach(function (fn) { fn(); });
+  });
+
+  /* ------------------------------------------------------------------------
+     TOC: mobile toggle + highlight the section being read
+     ------------------------------------------------------------------------ */
+  var tocBtn = $('.toc-toggle');
+  if (tocBtn) {
+    tocBtn.addEventListener('click', function () { document.body.classList.toggle('toc-open'); });
+  }
+  $$('.toc a').forEach(function (a) {
+    a.addEventListener('click', function () { document.body.classList.remove('toc-open'); });
+  });
+
+  (function initToc() {
+    var links = {};
+    $$('.toc a[data-id]').forEach(function (a) { links[a.dataset.id] = a; });
+    var heads = $$('.content h1[id], .content h2[id]').filter(function (h) { return links[h.id]; });
+    if (!heads.length || !('IntersectionObserver' in window)) return;
+
+    var current = null;
+    function setActive(id) {
+      if (current === id) return;
+      current = id;
+      $$('.toc a.active').forEach(function (a) { a.classList.remove('active'); });
+      $$('.toc li.grp.open').forEach(function (li) { li.classList.remove('open'); });
+      var a = links[id];
+      a.classList.add('active');
+      var grp = a.closest('li.grp');
+      if (grp) grp.classList.add('open');
+      var nav = $('.toc');
+      var top = a.offsetTop, bottom = top + a.offsetHeight;
+      if (top < nav.scrollTop + 40 || bottom > nav.scrollTop + nav.clientHeight - 40) {
+        nav.scrollTop = Math.max(0, top - nav.clientHeight / 3);
+      }
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { if (e.isIntersecting) setActive(e.target.id); });
+    }, { rootMargin: '-8% 0px -85% 0px' });
+    heads.forEach(function (h) { io.observe(h); });
+    setActive(heads[0].id);
+  })();
+
+  /* ------------------------------------------------------------------------
+     Diagram: zoom / pan / fullscreen around one rendered <svg>
+     ------------------------------------------------------------------------ */
+  function Diagram(fig) {
+    var self = this;
+    var slot = fig.parentElement;
+    var view = $('.dg-view', fig);
+    var stage = $('.dg-stage', fig);
+    var zoomOut = $('.dg-zoom', fig);
+    var S = { k: 1, x: 0, y: 0, w: 0, h: 0, mode: 'width' }; // mode: width | fit | free
+
+    function isFull() { return fig.classList.contains('is-full'); }
+
+    function apply() {
+      stage.style.transform = 'translate(' + S.x + 'px,' + S.y + 'px) scale(' + S.k + ')';
+      zoomOut.textContent = Math.round(S.k * 100) + '%';
+    }
+
+    function limitPan() {
+      // Never let the diagram be dragged completely out of view.
+      var vw = view.clientWidth, vh = view.clientHeight, keep = 48;
+      S.x = clamp(S.x, keep - S.w * S.k, vw - keep);
+      S.y = clamp(S.y, keep - S.h * S.k, vh - keep);
+    }
+
+    function setViewHeight(px) {
+      if (isFull()) return;
+      var h = Math.round(clamp(px, 200, window.innerHeight * 0.82));
+      if (view.style.height !== h + 'px') view.style.height = h + 'px';
+    }
+
+    function fitWidth() {
+      var vw = view.clientWidth;
+      var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
+      setViewHeight(S.h * S.k + 24);
+      var vh = view.clientHeight;
+      S.x = (vw - S.w * S.k) / 2;
+      S.y = S.h * S.k + 24 <= vh ? (vh - S.h * S.k) / 2 : 12;
+    }
+
+    function fitAll() {
+      if (!isFull()) setViewHeight(window.innerHeight * 0.7);
+      var vw = view.clientWidth, vh = view.clientHeight;
+      var k = Math.min((vw - 24) / S.w, (vh - 24) / S.h, isFull() ? 1.6 : 1);
+      S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
+      S.x = (vw - S.w * S.k) / 2;
+      S.y = (vh - S.h * S.k) / 2;
+    }
+
+    function refit() {
+      if (!S.w || S.mode === 'free') return;
+      if (S.mode === 'width') fitWidth(); else fitAll();
+      apply();
+    }
+
+    function setMode(mode) { S.mode = mode; refit(); }
+
+    function zoomAt(clientX, clientY, factor) {
+      var rect = view.getBoundingClientRect();
+      var px = clientX - rect.left, py = clientY - rect.top;
+      var nk = clamp(S.k * factor, MIN_ZOOM, MAX_ZOOM);
+      var f = nk / S.k;
+      S.x = px - (px - S.x) * f;
+      S.y = py - (py - S.y) * f;
+      S.k = nk;
+      S.mode = 'free';
+      limitPan();
+      apply();
+    }
+
+    function zoomCenter(factor) {
+      var r = view.getBoundingClientRect();
+      zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor);
+    }
+
+    function actualSize() {
+      var r = view.getBoundingClientRect();
+      zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1 / S.k);
+    }
+
+    function panBy(dx, dy) {
+      S.x += dx; S.y += dy; S.mode = 'free';
+      limitPan(); apply();
+    }
+
+    function setFull(on) {
+      if (on === isFull()) return;
+      if (on) slot.style.height = fig.offsetHeight + 'px';   // keep page layout from jumping
+      fig.classList.toggle('is-full', on);
+      if (!on) slot.style.height = '';
+      document.documentElement.classList.toggle('dg-lock', !!$('.diagram.is-full'));
+      $('[data-act="full"]', fig).textContent = on ? '✕' : '⤢';
+      $('[data-act="full"]', fig).title = on ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình (F)';
+      S.mode = on ? 'fit' : 'width';
+      requestAnimationFrame(function () { refit(); view.focus({ preventScroll: true }); });
+    }
+
+    /* --- content --- */
+    this.setSvg = function (markup) {
+      stage.innerHTML = markup;
+      var svg = $('svg', stage);
+      if (!svg) return false;
+      var vb = svg.viewBox && svg.viewBox.baseVal;
+      var w = vb && vb.width, h = vb && vb.height;
+      if (!w || !h) {
+        var bb = svg.getBBox();
+        w = bb.width; h = bb.height;
+      }
+      S.w = Math.ceil(w); S.h = Math.ceil(h);
+      svg.setAttribute('width', S.w);
+      svg.setAttribute('height', S.h);
+      svg.style.maxWidth = 'none';
+      stage.style.width = S.w + 'px';
+      stage.style.height = S.h + 'px';
+      S.mode = isFull() ? 'fit' : 'width';
+      refit();
+      return true;
+    };
+    this.setFull = setFull;
+    this.showMessage = function (html) {
+      S.w = 0;
+      stage.style.cssText = '';
+      stage.style.transform = 'none';
+      stage.innerHTML = '<div class="dg-msg">' + html + '</div>';
+    };
+
+    /* --- buttons --- */
+    fig.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-act]');
+      if (!b) return;
+      switch (b.dataset.act) {
+        case 'in':   zoomCenter(STEP); break;
+        case 'out':  zoomCenter(1 / STEP); break;
+        case 'one':  actualSize(); break;
+        case 'width': setMode('width'); break;
+        case 'fit':  setMode('fit'); break;
+        case 'full': setFull(!isFull()); break;
+      }
+    });
+
+    /* --- wheel: Ctrl/⌘ + wheel (or pinch) inline; plain wheel in fullscreen --- */
+    view.addEventListener('wheel', function (e) {
+      if (!(isFull() || e.ctrlKey || e.metaKey) || !S.w) return;
+      e.preventDefault();
+      var dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+      var sens = (e.ctrlKey && Math.abs(dy) < 50) ? 0.01 : 0.0015;   // trackpad pinch vs mouse wheel
+      zoomAt(e.clientX, e.clientY, Math.exp(-dy * sens));
+    }, { passive: false });
+
+    /* --- drag to pan, two fingers to pinch --- */
+    var ptrs = new Map();
+    var pinch = null;
+    function pinchState() {
+      var p = Array.from(ptrs.values());
+      return {
+        d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1,
+        cx: (p[0].x + p[1].x) / 2, cy: (p[0].y + p[1].y) / 2
+      };
+    }
+    view.addEventListener('pointerdown', function (e) {
+      if (!S.w || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      view.setPointerCapture(e.pointerId);
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      view.classList.add('grabbing');
+      pinch = ptrs.size === 2 ? pinchState() : null;
+    });
+    view.addEventListener('pointermove', function (e) {
+      var p = ptrs.get(e.pointerId);
+      if (!p) return;
+      if (ptrs.size === 1) {
+        panBy(e.clientX - p.x, e.clientY - p.y);
+        p.x = e.clientX; p.y = e.clientY;
+      } else if (ptrs.size === 2 && pinch) {
+        p.x = e.clientX; p.y = e.clientY;
+        var now = pinchState();
+        panBy(now.cx - pinch.cx, now.cy - pinch.cy);
+        zoomAt(now.cx, now.cy, now.d / pinch.d);
+        pinch = now;
+      }
+    });
+    function endPointer(e) {
+      ptrs.delete(e.pointerId);
+      pinch = null;
+      if (!ptrs.size) view.classList.remove('grabbing');
+    }
+    view.addEventListener('pointerup', endPointer);
+    view.addEventListener('pointercancel', endPointer);
+
+    view.addEventListener('dblclick', function (e) {
+      if (!S.w) return;
+      zoomAt(e.clientX, e.clientY, e.shiftKey ? 1 / 1.8 : 1.8);
+    });
+
+    /* --- keyboard (when the viewport has focus) --- */
+    view.addEventListener('keydown', function (e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      var handled = true;
+      switch (e.key) {
+        case '+': case '=': zoomCenter(STEP); break;
+        case '-': case '_': zoomCenter(1 / STEP); break;
+        case '0': setMode('fit'); break;
+        case '1': actualSize(); break;
+        case 'w': case 'W': setMode('width'); break;
+        case 'f': case 'F': setFull(!isFull()); break;
+        case 'ArrowLeft':  panBy(80, 0); break;
+        case 'ArrowRight': panBy(-80, 0); break;
+        case 'ArrowUp':    panBy(0, 80); break;
+        case 'ArrowDown':  panBy(0, -80); break;
+        default: handled = false;
+      }
+      if (handled) e.preventDefault();
+    });
+
+    /* --- keep fitted diagrams fitted when the box resizes --- */
+    if ('ResizeObserver' in window) {
+      var raf = 0;
+      new ResizeObserver(function () {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(refit);
+      }).observe(view);
+    }
+
+    fig._dg = self;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var f = $('.diagram.is-full');
+    if (f && f._dg) f._dg.setFull(false);
+  });
+
+  /* ------------------------------------------------------------------------
+     Build every diagram frame, then render Mermaid into it
+     ------------------------------------------------------------------------ */
+  function titleFor(fig) {
+    var el = fig.parentElement;
+    while ((el = el.previousElementSibling)) {
+      if (/^H[1-6]$/.test(el.tagName)) {
+        var clone = el.cloneNode(true);
+        var a = $('.anchor', clone);
+        if (a) a.remove();
+        return clone.textContent.trim();
+      }
+    }
+    return 'Sơ đồ';
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; });
+  }
+
+  var figs = $$('figure.diagram');
+  figs.forEach(function (fig) {
+    var title = escapeHtml(titleFor(fig));
+    fig.insertAdjacentHTML('afterbegin',
+      '<div class="dg-bar">' +
+        '<span class="dg-title" title="' + title + '">' + title + '</span>' +
+        '<span class="dg-hint">Kéo để di chuyển · Ctrl + cuộn để zoom · nhấp đúp để phóng to</span>' +
+        '<span class="dg-btns">' +
+          '<button type="button" data-act="out" title="Thu nhỏ (−)" aria-label="Thu nhỏ">−</button>' +
+          '<span class="dg-zoom" aria-live="polite">100%</span>' +
+          '<button type="button" data-act="in" title="Phóng to (+)" aria-label="Phóng to">+</button>' +
+          '<button type="button" data-act="one" title="Kích thước thật (1)">1:1</button>' +
+          '<button type="button" data-act="width" title="Vừa chiều rộng (W)">Vừa rộng</button>' +
+          '<button type="button" data-act="fit" title="Thấy toàn bộ sơ đồ (0)">Vừa khung</button>' +
+          '<button type="button" data-act="full" title="Toàn màn hình (F)" aria-label="Toàn màn hình">⤢</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="dg-view" tabindex="0" role="img" aria-label="' + title + '">' +
+        '<div class="dg-stage"><div class="dg-msg">Đang vẽ sơ đồ…</div></div>' +
+      '</div>');
+    new Diagram(fig);
+  });
+
+  if (!figs.length) return;
+
+  var mermaid = null;
+  var renderSeq = 0;
+
+  function mermaidConfig() {
+    return {
+      startOnLoad: false,
+      securityLevel: 'loose',
+      theme: isDark() ? 'dark' : 'default',
+      fontFamily: '"Segoe UI", system-ui, sans-serif',
+      flowchart: { useMaxWidth: false },
+      sequence: { useMaxWidth: false },
+      state: { useMaxWidth: false },
+      class: { useMaxWidth: false }
+    };
+  }
+
+  function showSource(fig, reason) {
+    fig._dg.showMessage(
+      '<div class="dg-err"><strong>Không vẽ được sơ đồ.</strong> ' + escapeHtml(reason) +
+      '<pre>' + escapeHtml(fig.dataset.src) + '</pre></div>');
+  }
+
+  async function renderAll() {
+    mermaid.initialize(mermaidConfig());
+    for (var i = 0; i < figs.length; i++) {
+      var fig = figs[i];
+      try {
+        var out = await mermaid.render('dg-svg-' + (++renderSeq), fig.dataset.src);
+        if (!fig._dg.setSvg(out.svg)) showSource(fig, 'Mermaid không trả về SVG.');
+      } catch (err) {
+        showSource(fig, String((err && err.message) || err));
+      }
+    }
+  }
+
+  import(MERMAID_URL).then(function (mod) {
+    mermaid = mod.default;
+    themeListeners.push(renderAll);
+    return renderAll();
+  }).catch(function () {
+    figs.forEach(function (fig) {
+      showSource(fig, 'Cần internet để tải thư viện Mermaid (' + MERMAID_URL + ').');
+    });
+  });
+})();
+
 </script>
 </body>
 </html>

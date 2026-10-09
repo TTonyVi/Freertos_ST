@@ -21,8 +21,6 @@
 
 static void OLED_Render(const DisplayMsg_t *msg)
 {
-    char line[22];
-
     BSP_OLED_Clear();
 
     /* Row 0 — static title */

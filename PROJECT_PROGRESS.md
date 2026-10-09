@@ -64,7 +64,7 @@ communication objects before writing any task logic.
 **Goal:** Process button events, manage menu navigation, and generate commands
 for WashingManager.
 
-- [x] `App/BSP/Inc/bsp_button.h` — button abstraction (debounce, long-press detection)
+- [x] `App/BSP/Inc/bsp_button.h` — button abstraction (quiet-window debounce; long-press detection was later removed, see Code Cleanup 2026-08-29)
 - [x] `App/BSP/Src/bsp_button.c` — EXTI ISR handler, posts `ButtonEvent_t` to `xButtonQueue`
 - [x] `App/UITask/Inc/ui_task.h` — task prototype
 - [x] `App/UITask/Src/ui_task.c` — reads `xButtonQueue`, manages `menuIndex`, posts `CommandMsg_t`
@@ -166,9 +166,162 @@ the SystemView timeline.
 
 ## Current Focus
 
+### Docs Tooling — zoomable HTML docs `[DONE]` 2026-10-09
+
+**Goal:** Make the diagrams in the HTML docs readable — the architecture diagram
+is 2757 × 2157 px natively but was shrunk to ~35 % to fit the page, with no way
+to zoom — and stop the three HTML files drifting away from their `.md` sources.
+
+**Files changed**
+
+- New `tools/build_docs.mjs`, `template.html`, `viewer.css`, `viewer.js`,
+  `package.json`, `package-lock.json` — the generator.
+- Regenerated `docs/SYSTEM_DIAGRAMS.html`, `PROJECT_SPEC.html`,
+  `docs/START_HERE.html` (all self-contained: CSS/JS inlined).
+- `.gitignore` — ignore `tools/node_modules/`.
+- `docs/START_HERE.md` §0.1 — pointer to the HTML versions and how they are built.
+
+**What changed**
+
+- Each ` ```mermaid ` block becomes a frame with drag-to-pan, Ctrl+wheel / pinch
+  zoom at the cursor, double-click zoom, `− + 1:1 Vừa rộng Vừa khung` buttons,
+  keyboard shortcuts and a fullscreen mode (plain wheel = zoom there).
+- Pages gained a left-hand TOC that opens the chapter being read, C syntax
+  highlighting, light/dark theme (diagrams re-render with the matching Mermaid
+  theme), heading permalinks and a switcher between the three docs.
+- Mermaid is pinned to 10.9.8 from a CDN; if it cannot load, each frame shows the
+  diagram source as text instead of staying blank.
+- Output has no timestamps, so rebuilding unchanged `.md` yields no git diff.
+
+**Why**
+
+- `PROJECT_SPEC.html` loaded Mermaid from `file:///c:\Users\Dell\.vscode\extensions\...`
+  — it only worked on one machine. `SYSTEM_DIAGRAMS.html` was hand-written with
+  no way to regenerate it. Three files, three origins, none reproducible.
+- Plain wheel does **not** zoom inline (only Ctrl+wheel): otherwise a diagram
+  swallows page scrolling whenever the cursor passes over it.
+- Default view fits *width*, not the whole frame — tall diagrams (sequence
+  diagrams) fitted whole become unreadably small.
+
+**Verification:** drove real Chrome with puppeteer-core — 25/25 checks (zoom,
+pan, fullscreen, theme re-render, TOC, no JS errors). Static: 0 broken `#` links
+out of 215, 0 leftover placeholders. Run: `cd tools && npm install && npm run build`.
+
+**What I should learn from it:**
+1. A derived file needs a *reproducible* generator or it silently rots; the old
+   hand-written HTML claimed "regenerate when diagrams change" with no means to.
+2. Verify UI work by driving a real browser. Two checks failed on the first run
+   and both were bugs in the *test*, not the page — isolating that before touching
+   the code is the discipline.
+3. Zoom treats the symptom. A 2757 px-wide diagram means the diagram does too
+   much; splitting it into three would fix the cause (not done yet).
+
+---
+
+### Code Cleanup — Button debounce rewrite `[DONE]` 2026-08-29
+
+**Goal:** Remove the short/long-press leftovers from the button BSP and give
+both buttons one consistent, correct debounce.
+
+**Trigger:** user spotted that `BSP_Button_IRQHandler()` still measured press
+duration, long after the short/long-press design had been replaced by two
+separate pins.
+
+**What changed**
+
+- `App/BSP/Src/bsp_button.c` — both ISRs rewritten around a quiet-window
+  filter: an edge becomes a gesture only after `BUTTON_DEBOUNCE_MS` of silence,
+  and **every** edge reloads the window (including rejected ones). Removed
+  `s_pressStartMs`, `s_pressed` and all duration arithmetic. Each button keeps
+  its own timestamp.
+- Both buttons now fire on the **press** edge. PA0 previously fired on release —
+  a constraint inherited from duration measurement, meaningless once long-press
+  was dropped.
+- PD2 gained debouncing for the first time; it previously fired
+  `BTN_EVENT_CONFIRM` on every falling edge, so one bounced press produced
+  several CONFIRM events. The symptom was masked downstream by the
+  `xQueueReset(xCommandQueue)` calls in `washing_manager.c`.
+- `App/Common/Inc/app_config.h` — deleted dead macro `BUTTON_LONG_PRESS_MS`;
+  rewrote the `BUTTON_DEBOUNCE_MS` comment for the new mechanism.
+- `App/Common/Inc/app_types.h` — corrected "the BSP measures duration".
+- `App/BSP/Inc/bsp_button.h` — corrected "on release" → "on press"; restored the
+  missing "Button 2 — Start / Confirm (PD2)" heading that made the file comment
+  read as if it were still describing PA0.
+- `docs/LEARNING_NOTES.md` — "Design: Debounce" rewritten; old mechanism kept
+  collapsed for historical comparison; the "dead macro" note marked resolved.
+
+**Rejected alternatives** (full reasoning in `QA_LOG.md` Session 13): comparing
+against the last *accepted event* rather than the last *edge* (lets the
+release-bounce burst through after a long hold); re-reading the pin level on PD2
+(risks rejecting a real press during press bounce).
+
+**Known limit:** `.ioc` keeps EXTI2 on the falling edge only, so PD2's handler
+never sees the release edge — a release-bounce burst can still yield one
+spurious CONFIRM. Documented in `bsp_button.c`. Not changing `.ioc` avoids the
+CubeMX GPIOD-reset hazard recorded in `docs/GPIO_CONFIG.md`.
+
+**Follow-on — missing prototypes fixed the same day:** the build surfaced
+`implicit declaration of 'BSP_Sensor_Poll'`. `bsp_sensor.h` declared only the
+two `Is*()` getters, so `BSP_Sensor_Init()` and `BSP_Sensor_Poll()` were being
+called with the compiler assuming `int f()` — correct here only by ABI
+coincidence, and a hard error from C23 on. Added both prototypes; also added the
+missing `#include "bsp_sensor.h"` to `main.c` (the header alone did not silence
+`main.c`, which never included it — visible only on a clean build), corrected the
+stale "changed via the debugger" comment in `bsp_sensor.h`, and removed the
+unused `char line[22]` in `oled_task.c`.
+
+**Verification:** `make clean && make all` → **0 warnings, 0 errors** across the
+whole project. `text 37880 / data 44 / bss 85812`. Hardware re-test of the Tầng 0
+scenarios still pending.
+
+**What I should learn from it:** a dead macro is the visible half of an
+unfinished refactor. The dangerous half is the *control structure* the removed
+feature left behind — it still dictates real behaviour, and nobody questions it
+because the code works. When removing a feature, trace which constraints it had
+imposed on everything else, and remove those too.
+
+---
+
 ### Phase 9 — CPU Load Measurement
 
 Phases 1–8 hoàn thành. Tiếp theo: đo CPU utilization per-task bằng DWT + FreeRTOS run-time stats.
+
+---
+
+### Documentation Track — `docs/START_HERE.md` `[IN_PROGRESS]` 4/7 tầng
+
+**Goal:** Provide an onboarding path so a reader who knows C and STM32 HAL but
+has never used an RTOS can reach full understanding of this project.
+
+**Why it was needed:** `LEARNING_NOTES.md` is a *reference* — organised by
+primitive (Part A) and by build chronology (Part B). Both orders assume prior
+knowledge. No document told a newcomer where to start.
+
+**Design rules adopted** (full rationale in `QA_LOG.md` Session 12):
+problem-before-primitive · show the naive solution failing first · quote real
+repo code with `file:line` · every level must be observable on the board ·
+predict-then-measure · one new concept per level · stay shallow here and link
+into `LEARNING_NOTES.md` for depth · **answers and full explanations sit directly
+under each question — no collapsed `<details>`, no answer key at the end**
+(added 2026-08-29 after review of Tầng 0–1).
+
+- [x] Tầng 0 — Sờ vào hệ thống (hardware map, 7 states, boot sequence, run a full cycle)
+- [x] Tầng 1 — Vì sao cần RTOS (task, Ready/Running/Blocked, priority, stack, `HAL_Delay` starvation experiment)
+- [x] Tầng 2 — Bốn task của project (4 tiêu chí chia task, bảng priority, lớp BSP, ownership; thí nghiệm đổi `MOTOR_PIN`)
+- [x] Tầng 3 — Task nói chuyện với nhau (Queue: 4 lỗ hổng của biến toàn cục, copy-by-value, timeout 0 vs portMAX_DELAY; thí nghiệm `disp.menuIndex = 99` chứng minh queue chụp ảnh dữ liệu)
+- [ ] Tầng 4 — Chờ nhiều điều kiện (Event Group)
+- [ ] Tầng 5 — State Machine + Software Timer
+- [ ] Tầng 6 — Từ chân MCU đến task (ISR)
+
+**Deferred by decision (2026-08-29):** debug tooling — SEGGER SystemView, RTT,
+logic analyzer — is **out of scope** for this onboarding path. Tầng 0–6 require
+only the board, its LEDs and buttons. A trace-reading level may be added later
+as Tầng 7.
+
+**What I should learn from it:** a reference document and a teaching document
+are different artefacts with different orderings; merging them serves neither
+reader. The ordering of a teaching document is driven by *when the reader feels
+the need*, not by the structure of the subject matter.
 
 ---
 

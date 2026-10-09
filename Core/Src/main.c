@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FreeRTOS.h"
+#include "bsp_sensor.h"
 #include "freertos_objects.h"
 #include "oled_task.h"
 #include "sensor_task.h"

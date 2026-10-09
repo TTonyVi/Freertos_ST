@@ -59,8 +59,9 @@ typedef enum
  * ButtonEvent_t
  *
  * Raw gesture produced by the BSP button layer after debouncing.
- * The ISR captures the GPIO edge; the BSP measures duration and posts
- * one of these values to the Button Queue.
+ * The ISR captures the GPIO edge; the BSP applies a quiet-window filter
+ * and posts one of these values to the Button Queue on the press edge.
+ * No press duration is measured — each pin carries exactly one gesture.
  *
  * UITask interprets a ButtonEvent_t in the context of the current
  * menu state to generate a Command_t.  The ISR never generates

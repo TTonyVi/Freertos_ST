@@ -31,10 +31,14 @@
  * Button behavior (milliseconds)
  * -------------------------------------------------------------------------- */
 
-/** Hold time that distinguishes a long press from a short press. */
-#define BUTTON_LONG_PRESS_MS         1500U
-
-/** Debounce filter window applied in the ISR / BSP layer. */
+/**
+ * Quiet-window debounce applied in the BSP button ISRs.
+ *
+ * An edge is accepted as a gesture only if the line was quiet for at least
+ * this long beforehand; every edge reloads the window. Contact bounce lasts
+ * a few ms, so 50 ms filters it with a wide margin while staying far below
+ * the ~150 ms a human needs between two deliberate presses.
+ */
 #define BUTTON_DEBOUNCE_MS             50U
 
 /* --------------------------------------------------------------------------

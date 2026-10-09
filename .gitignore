@@ -34,3 +34,6 @@ Debug/Freertos.list
 Debug/App/OLEDTask/Src/oled_task.o
 Debug/Freertos.elf
 Debug/Freertos.list
+
+# Docs build tooling
+tools/node_modules/

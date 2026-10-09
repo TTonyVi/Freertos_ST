@@ -7,6 +7,32 @@
  *   1. Callback registration  (BSP_Button_RegisterCallback, called from UITask)
  *   2. IRQ edge processing    (BSP_Button_IRQHandler, BSP_StartButton_IRQHandler)
  *
+ * Gesture model:
+ *   Each button carries exactly one gesture and fires on the PRESS edge, so
+ *   the UI reacts while the finger is still down.  No press-duration is
+ *   measured anywhere — long-press was removed from this design when the
+ *   Start/Confirm function moved to its own pin (PD2).
+ *
+ * Debounce strategy — quiet-window filter:
+ *   Every edge reloads that button's "last edge" timestamp, whether or not the
+ *   edge is accepted.  An edge becomes a gesture only if the line was quiet
+ *   for at least BUTTON_DEBOUNCE_MS beforehand.  Contact bounce arrives as a
+ *   burst of edges a few ms apart, so only the first edge of a burst survives.
+ *
+ *   Reloading on rejected edges is the whole point: a filter that compared
+ *   against the last ACCEPTED event instead would let the release-bounce burst
+ *   through, since it can occur seconds after the press was accepted.
+ *
+ *   Each button keeps its own timestamp — pressing one must never suppress
+ *   the other.
+ *
+ *   Known limit on PD2: the .ioc configures EXTI2 for the falling edge only,
+ *   so this handler never observes the release edge.  Bounce within a single
+ *   press is filtered, but the first edge of a release-bounce burst can still
+ *   pass as one spurious CONFIRM.  If that is ever observed on hardware, the
+ *   fix is to enable both edges for PD2 in CubeMX so releases reload the
+ *   timestamp the same way PA0 does.
+ *
  * CubeMX settings required in .ioc:
  *   PA0 : GPIO_MODE_IT_RISING_FALLING, no pull, NVIC priority 5, enabled
  *   PD2 : GPIO_MODE_IT_FALLING, pull-up, NVIC priority 5, enabled
@@ -22,11 +48,14 @@
 
 /* --------------------------------------------------------------------------
  * Module state
+ *
+ * One timestamp per button. Both start at 0, which reads as "quiet since
+ * boot", so the very first press is always accepted.
  * -------------------------------------------------------------------------- */
 
 static BSP_Button_EventCb_t s_callback = NULL;
-static uint32_t s_pressStartMs = 0u;
-static uint8_t s_pressed = 0u;
+static uint32_t s_lastMenuEdgeMs = 0u;  /* PA0 — reloaded on both edges     */
+static uint32_t s_lastStartEdgeMs = 0u; /* PD2 — falling edges only         */
 
 /* --------------------------------------------------------------------------
  * Public API
@@ -34,45 +63,55 @@ static uint8_t s_pressed = 0u;
 
 void BSP_Button_RegisterCallback(BSP_Button_EventCb_t callback) {
   s_callback = callback;
-  s_pressStartMs = 0u;
-  s_pressed = 0u;
+  s_lastMenuEdgeMs = 0u;
+  s_lastStartEdgeMs = 0u;
 }
 
-void BSP_Button_IRQHandler(void) {
-  if (HAL_GPIO_ReadPin(MENU_BUTTON_PORT, MENU_BUTTON_PIN) == GPIO_PIN_SET) {
-    /* Rising edge — record press start time. */
-    s_pressStartMs = HAL_GetTick();
-    s_pressed = 1u;
-  } else {
-    /* Falling edge — check duration for debounce, then fire short press. */
-    if (s_pressed) {
-      uint32_t duration = HAL_GetTick() - s_pressStartMs;
-      s_pressed = 0u;
+/* --------------------------------------------------------------------------
+ * PA0 Menu/Navigate button — IRQ handler
+ *
+ * EXTI0 fires on both edges. Active HIGH (external pull-down on the DISCO
+ * board), so pin == SET means the button is down.
+ *
+ * The unsigned subtraction stays correct across the 32-bit HAL_GetTick()
+ * wrap (~49 days).
+ * -------------------------------------------------------------------------- */
 
-      if (duration >= BUTTON_DEBOUNCE_MS) {
-        /* Any press longer than debounce threshold = short press.
-         * Long-press gesture is no longer handled on PA0. */
-        if (s_callback != NULL) {
-          s_callback(BTN_EVENT_NAVIGATE);
-        }
-      }
-      /* else: noise, ignore */
-    }
+void BSP_Button_IRQHandler(void) {
+  uint32_t now = HAL_GetTick();
+  uint8_t quiet = ((now - s_lastMenuEdgeMs) >= BUTTON_DEBOUNCE_MS) ? 1u : 0u;
+  uint8_t pressed =
+      (HAL_GPIO_ReadPin(MENU_BUTTON_PORT, MENU_BUTTON_PIN) == GPIO_PIN_SET) ? 1u
+                                                                            : 0u;
+
+  /* Every edge reloads the quiet window — including release and bounce. */
+  s_lastMenuEdgeMs = now;
+
+  if (pressed && quiet && (s_callback != NULL)) {
+    s_callback(BTN_EVENT_NAVIGATE);
   }
 }
 
 /* --------------------------------------------------------------------------
  * PD2 Start/Confirm button — IRQ handler
+ *
  * GPIO + NVIC configured by CubeMX (.ioc):
  *   PD2: GPIO_MODE_IT_FALLING, pull-up, NVIC EXTI2 priority 5, enabled
  * Kết nối: MCU PD2 ─── [Nút Start] ─── GND
+ *
+ * Falling edge only, so every interrupt here is a candidate press — the pin
+ * level is not re-read. Sampling it would risk reading the bounce transient
+ * HIGH and dropping a real press, which is a worse trade than the spurious
+ * event described in the header comment.
  * -------------------------------------------------------------------------- */
 
-void BSP_StartButton_IRQHandler(void)
-{
-    /* Any falling edge on PD2 = Start/Confirm. */
-    if (s_callback != NULL)
-    {
-        s_callback(BTN_EVENT_CONFIRM);
-    }
+void BSP_StartButton_IRQHandler(void) {
+  uint32_t now = HAL_GetTick();
+  uint8_t quiet = ((now - s_lastStartEdgeMs) >= BUTTON_DEBOUNCE_MS) ? 1u : 0u;
+
+  s_lastStartEdgeMs = now;
+
+  if (quiet && (s_callback != NULL)) {
+    s_callback(BTN_EVENT_CONFIRM);
+  }
 }

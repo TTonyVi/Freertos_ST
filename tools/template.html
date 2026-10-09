@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<!--
+  GENERATED FILE — do not edit by hand.
+  Source of truth: {{SRC}}
+  Rebuild:         cd tools && npm install && npm run build
+  Diagrams are drawn by Mermaid, loaded from a CDN (internet needed to draw them;
+  without it the diagram source is shown as text).
+-->
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('doc-theme'); } catch (e) {}
+    if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
+<style>
+{{CSS}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
+  <a class="brand" href="#top">{{BRAND}}</a>
+  <nav class="docnav" aria-label="Bộ tài liệu">{{NAV}}</nav>
+  <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
+</header>
+<div class="layout" id="top">
+  <nav class="toc" aria-label="Mục lục">
+{{TOC}}
+  </nav>
+  <main class="content">
+{{CONTENT}}
+    <footer class="doc-footer">
+      Sinh tự động từ <code>{{SRC}}</code>. Sửa file <code>.md</code> rồi chạy
+      <code>npm run build</code> trong <code>tools/</code> — đừng sửa tay file này.
+    </footer>
+  </main>
+</div>
+<script>
+{{JS}}
+</script>
+</body>
+</html>

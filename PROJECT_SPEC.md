@@ -330,41 +330,77 @@ stateDiagram-v2
 
 # 7. RTOS Architecture
 
-Button ISR
+Bốn task chia sẻ với nhau qua ba queue và một event group. Mọi luồng dữ liệu đều
+**một chiều** và mỗi đối tượng chỉ có **một bên gửi, một bên nhận chính**.
 
-↓
+```mermaid
+flowchart TB
+    subgraph CMD["① Luồng lệnh người dùng"]
+        ISR(["<b>Button ISR</b><br/>PA0 · PD2"])
+        BQ[("<b>Button Queue</b>")]
+        UI["<b>UI Task</b> · Prio 2<br/>menu · tạo lệnh"]
+        CQ[("<b>Command Queue</b>")]
+        ISR --> BQ --> UI --> CQ
+    end
 
-Button Queue
+    subgraph EVT["② Luồng sự kiện hệ thống"]
+        SNS["<b>Sensor Task</b> · Prio 2<br/>mỗi 100 ms: cửa · mực nước"]
+        TMR{{"<b>Software Timers</b><br/>hết giờ từng giai đoạn"}}
+        EG[["<b>Event Group</b><br/>DOOR_CLOSED · WATER_FULL<br/>TIMEOUT · FINISHED · ERROR"]]
+        SNS --> EG
+        TMR --> EG
+    end
 
-↓
+    WM["<b>WashingManager Task</b> · Prio 3<br/>chủ duy nhất của máy trạng thái<br/>điều khiển motor · van · đèn"]
 
-UI Task
+    subgraph DSP["③ Luồng hiển thị"]
+        DQ[("<b>Display Queue</b>")]
+        OLED["<b>OLED Task</b> · Prio 1<br/>chủ duy nhất của OLED"]
+        DQ --> OLED
+    end
 
-↓
+    CQ --> WM
+    EG --> WM
+    WM --> DQ
 
-Command Queue
+    classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef queue fill:#e3f6e8,stroke:#2f9e44,stroke-width:2px,color:#1f2328
+    classDef event fill:#f1e6ff,stroke:#9333ea,stroke-width:2px,color:#1f2328
+    classDef timer fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    class ISR isr
+    class UI,SNS,OLED task
+    class BQ,CQ,DQ queue
+    class EG event
+    class TMR timer
+    class WM hub
 
-↓
+    style CMD fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+    style EVT fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+    style DSP fill:#64748b1f,stroke:#64748b,stroke-dasharray:5 4
+```
 
-WashingManager Task
+| Ký hiệu | Loại | Vai trò |
+| --- | --- | --- |
+| 🟠 bầu dục | **ISR** | Chạy trong ngắt, chỉ ghi vào queue rồi thoát |
+| 🔵 hộp chữ nhật | **Task** | Vòng lặp vô hạn, phần lớn thời gian ở trạng thái Blocked |
+| 🟢 hình trụ | **Queue** | Chuyển dữ liệu theo thứ tự (FIFO), sao chép theo giá trị |
+| 🟣 hộp đôi | **Event Group** | Bộ cờ trạng thái dùng chung, task chờ tổ hợp bit |
+| ⚪ lục giác | **Software Timer** | Đếm giờ, hết giờ thì set bit `EVT_TIMEOUT` |
 
-↑
+**Cách đọc:**
 
-Event Group
+1. **Luồng lệnh** — nút bấm tạo ngắt; ISR đẩy sự kiện vào Button Queue; UI Task
+   diễn giải theo vị trí con trỏ menu rồi gửi lệnh Start qua Command Queue.
+2. **Luồng sự kiện** — Sensor Task (định kỳ) và các Software Timer (khi hết giờ)
+   set bit vào Event Group; WashingManager chờ đúng những bit có nghĩa ở trạng
+   thái hiện tại.
+3. **Luồng hiển thị** — WashingManager gửi nội dung cần vẽ vào Display Queue;
+   OLED Task là task duy nhất được chạm vào OLED.
 
-↑
-
-Sensor Task
-
-WashingManager
-
-↓
-
-Display Queue
-
-↓
-
-OLED Task
+> **Mutex** (bảo vệ OLED, UART debug) là mở rộng dự kiến — xem mục 9, chưa nằm
+> trong sơ đồ này.
 
 ---
 

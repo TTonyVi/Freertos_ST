@@ -81,10 +81,10 @@ EventGroupHandle_t xSystemEvents = NULL;
  *
  * Approximate RAM cost:
  *   xButtonQueue   : ~96  bytes  (5 × sizeof(ButtonEvent_t) = 5 × 4)
- *   xCommandQueue  : ~116 bytes  (5 × sizeof(CommandMsg_t)  = 5 × 8)
+ *   xCommandQueue  : ~136 bytes  (5 × sizeof(CommandMsg_t)  = 5 × 12)
  *   xDisplayQueue  : ~256 bytes  (5 × sizeof(DisplayMsg_t)  = 5 × 36)
  *   xSystemEvents  : ~76  bytes
- *   Total          : ~544 bytes  (out of 128 KB SRAM — negligible)
+ *   Total          : ~564 bytes  (out of 128 KB SRAM — negligible)
  *
  * configASSERT() traps at boot if any allocation fails, ensuring a
  * heap misconfiguration is caught immediately rather than causing a
@@ -110,7 +110,8 @@ void App_FreeRTOSObjectsInit(void)
      * Command Queue
      *
      * sizeof(CommandMsg_t) = sizeof(Command_t) + sizeof(WashMode_t)
-     *                      = 4 + 4 = 8 bytes.
+     *                      + sizeof(uint8_t) + 3 padding
+     *                      = 4 + 4 + 1 + 3 = 12 bytes.
      * The full struct is copied into the queue storage on each send.
      * ----------------------------------------------------------------------- */
     xCommandQueue = xQueueCreate(COMMAND_QUEUE_LENGTH, sizeof(CommandMsg_t));

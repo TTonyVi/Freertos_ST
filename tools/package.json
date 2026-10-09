@@ -1,0 +1,13 @@
+{
+  "name": "docs-build",
+  "private": true,
+  "type": "module",
+  "description": "Builds the HTML versions of the project's Markdown docs (zoomable diagrams, TOC, dark mode).",
+  "scripts": {
+    "build": "node build_docs.mjs"
+  },
+  "dependencies": {
+    "highlight.js": "^11.10.0",
+    "markdown-it": "^14.1.0"
+  }
+}

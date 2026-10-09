@@ -3,16 +3,18 @@
  * @brief   Button BSP — two physical buttons with separate responsibilities.
  *
  * Button 1 — Menu Navigate (PA0, B1 on-board):
- *   Detects short press only. Generates BTN_EVENT_NAVIGATE on release.
- *   Long-press detection has been removed; PA0 is now a single-gesture input.
+ *   Generates BTN_EVENT_NAVIGATE on the press edge. Single-gesture input:
+ *   long-press detection was removed when Confirm moved to its own pin, and
+ *   no press duration is measured any more.
  *
  *   Hardware mapping:
  *     Pin   : PA0
  *     EXTI  : EXTI0, both edges (rising = press, falling = release)
  *     Pull  : none (external pull-down on DISCO board — active HIGH)
  *
- *   Generates BTN_EVENT_CONFIRM on falling edge (button press).
- *   No duration measurement needed — any press confirms the selection.
+ * Button 2 — Start / Confirm (PD2, external):
+ *   Generates BTN_EVENT_CONFIRM on the press edge (falling). Any press
+ *   confirms the current menu selection; no duration measurement.
  *
  *   Hardware mapping:
  *     Pin   : PD2 — third pin tried for this button. Moved off PE1 first
@@ -27,6 +29,12 @@
  *
  * Both ISRs route to the same xButtonQueue via the same registered callback,
  * so UITask requires no changes: NAVIGATE = navigate, CONFIRM = start.
+ *
+ * Debounce:
+ *   Both handlers use the same quiet-window filter — an edge counts as a
+ *   gesture only after BUTTON_DEBOUNCE_MS of silence, and every edge reloads
+ *   that window. Each button owns its own timestamp. See bsp_button.c for the
+ *   rationale and for the known limit on PD2 (falling-edge-only EXTI).
  *
  * Priority note:
  *   Both EXTI0 and EXTI2 are set to preempt priority 5 so that
@@ -58,7 +66,7 @@ void BSP_Button_RegisterCallback(BSP_Button_EventCb_t callback);
 /** @brief Call from EXTI0_IRQHandler. Debounces PA0 → BTN_EVENT_NAVIGATE. */
 void BSP_Button_IRQHandler(void);
 
-/** @brief Call from EXTI2_IRQHandler. Fires BTN_EVENT_CONFIRM on any press. */
+/** @brief Call from EXTI2_IRQHandler. Debounces PD2 → BTN_EVENT_CONFIRM. */
 void BSP_StartButton_IRQHandler(void);
 
 #endif /* APP_BSP_BSP_BUTTON_H */
