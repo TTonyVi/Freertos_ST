@@ -35,6 +35,7 @@ static uint8_t    s_menuIndex    = 0u;
 static const char *Manager_StatusText(WashState_t state);
 static void Manager_PostDisplay(WashState_t state);
 static void Manager_HandleCommand(const CommandMsg_t *cmd);
+static void Manager_StartPhaseTimer(TimerHandle_t timer);
 
 /* SM entry-action callbacks — one per state */
 static void Manager_OnEnterIdle(void);
@@ -57,6 +58,26 @@ static void Manager_OnEnterError(void);
  * These run in WashingManager task context (not ISR).
  * -------------------------------------------------------------------------- */
 
+/*
+ * Start the one-shot timer of a timed phase (fill / wash / drain / spin).
+ *
+ * All four timers share ONE bit, EVT_TIMEOUT, so the bit carries no
+ * information about WHICH timer fired. A bit left over from the previous
+ * phase would therefore be mistaken for the new phase finishing at once.
+ * Clearing it here, right before the new timer starts, removes any such
+ * stale bit; the new timer cannot have fired yet.
+ *
+ * Residual window: xTimerStop() of the previous timer only queues a command,
+ * and the timer service task handles an already-expired timer BEFORE it reads
+ * its command queue. If the old timer expires in that gap its callback sets
+ * EVT_TIMEOUT after this clear. Closing it fully needs one bit per timer.
+ */
+static void Manager_StartPhaseTimer(TimerHandle_t timer)
+{
+    xEventGroupClearBits(xSystemEvents, EVT_TIMEOUT);
+    xTimerStart(timer, 0);
+}
+
 static void Manager_OnEnterIdle(void)
 {
     BSP_Motor_Stop();
@@ -77,7 +98,7 @@ static void Manager_OnEnterFillWater(void)
 {
     BSP_Valve_Open(BSP_VALVE_INLET);
     BSP_LED_On();
-    xTimerStart(xFillTimeoutTimer, 0);
+    Manager_StartPhaseTimer(xFillTimeoutTimer);
     Manager_PostDisplay(WASH_STATE_FILL_WATER);
 }
 
@@ -85,7 +106,7 @@ static void Manager_OnEnterWashing(void)
 {
     BSP_Valve_Close(BSP_VALVE_INLET);   /* stop filling before motor starts */
     BSP_Motor_Start();
-    xTimerStart(xWashTimer, 0);
+    Manager_StartPhaseTimer(xWashTimer);
     Manager_PostDisplay(WASH_STATE_WASHING);
 }
 
@@ -93,7 +114,7 @@ static void Manager_OnEnterDrain(void)
 {
     BSP_Motor_Stop();
     BSP_Valve_Open(BSP_VALVE_DRAIN);
-    xTimerStart(xDrainTimer, 0);
+    Manager_StartPhaseTimer(xDrainTimer);
     Manager_PostDisplay(WASH_STATE_DRAIN);
 }
 
@@ -101,7 +122,7 @@ static void Manager_OnEnterSpin(void)
 {
     BSP_Valve_Close(BSP_VALVE_DRAIN);
     BSP_Motor_Start();
-    xTimerStart(xSpinTimer, 0);
+    Manager_StartPhaseTimer(xSpinTimer);
     Manager_PostDisplay(WASH_STATE_SPIN);
 }
 
@@ -294,6 +315,12 @@ void WashingManager_Task(void *pvParameters)
              * Block until SensorTask sets EVT_WATER_FULL, or a fill-timeout
              * timer (Phase 7) sets EVT_TIMEOUT.
              * Either bit clears automatically on exit (pdTRUE).
+             *
+             * EVT_ERROR is tested FIRST in every timed state. xClearOnExit
+             * clears the whole wait mask, so when two bits arrive together
+             * only the first branch below runs and the other bit is gone.
+             * Safety wins that race: a fault must never lose to a normal
+             * event. The same order is used in WASHING / DRAIN / SPIN.
              * -------------------------------------------------------------- */
             case WASH_STATE_FILL_WATER:
             {
@@ -304,7 +331,12 @@ void WashingManager_Task(void *pvParameters)
                     pdFALSE,
                     portMAX_DELAY);
 
-                if ((bits & EVT_WATER_FULL) != 0u)
+                if ((bits & EVT_ERROR) != 0u)
+                {
+                    xTimerStop(xFillTimeoutTimer, 0);
+                    WashingSM_ProcessEvent(WASH_EVT_ERROR);
+                }
+                else if ((bits & EVT_WATER_FULL) != 0u)
                 {
                     xTimerStop(xFillTimeoutTimer, 0);
                     WashingSM_ProcessEvent(WASH_EVT_WATER_FULL);
@@ -312,11 +344,6 @@ void WashingManager_Task(void *pvParameters)
                 else if ((bits & EVT_TIMEOUT) != 0u)
                 {
                     WashingSM_ProcessEvent(WASH_EVT_TIMEOUT);
-                }
-                else if ((bits & EVT_ERROR) != 0u)
-                {
-                    xTimerStop(xFillTimeoutTimer, 0);
-                    WashingSM_ProcessEvent(WASH_EVT_ERROR);
                 }
                 break;
             }
@@ -330,14 +357,14 @@ void WashingManager_Task(void *pvParameters)
                     pdFALSE,
                     portMAX_DELAY);
 
-                if ((bits & EVT_TIMEOUT) != 0u)
-                {
-                    WashingSM_ProcessEvent(WASH_EVT_WASH_DONE);
-                }
-                else if ((bits & EVT_ERROR) != 0u)
+                if ((bits & EVT_ERROR) != 0u)
                 {
                     xTimerStop(xWashTimer, 0);
                     WashingSM_ProcessEvent(WASH_EVT_ERROR);
+                }
+                else if ((bits & EVT_TIMEOUT) != 0u)
+                {
+                    WashingSM_ProcessEvent(WASH_EVT_WASH_DONE);
                 }
                 break;
             }
@@ -351,14 +378,14 @@ void WashingManager_Task(void *pvParameters)
                     pdFALSE,
                     portMAX_DELAY);
 
-                if ((bits & EVT_TIMEOUT) != 0u)
-                {
-                    WashingSM_ProcessEvent(WASH_EVT_DRAIN_DONE);
-                }
-                else if ((bits & EVT_ERROR) != 0u)
+                if ((bits & EVT_ERROR) != 0u)
                 {
                     xTimerStop(xDrainTimer, 0);
                     WashingSM_ProcessEvent(WASH_EVT_ERROR);
+                }
+                else if ((bits & EVT_TIMEOUT) != 0u)
+                {
+                    WashingSM_ProcessEvent(WASH_EVT_DRAIN_DONE);
                 }
                 break;
             }
@@ -372,14 +399,14 @@ void WashingManager_Task(void *pvParameters)
                     pdFALSE,
                     portMAX_DELAY);
 
-                if ((bits & EVT_TIMEOUT) != 0u)
-                {
-                    WashingSM_ProcessEvent(WASH_EVT_SPIN_DONE);
-                }
-                else if ((bits & EVT_ERROR) != 0u)
+                if ((bits & EVT_ERROR) != 0u)
                 {
                     xTimerStop(xSpinTimer, 0);
                     WashingSM_ProcessEvent(WASH_EVT_ERROR);
+                }
+                else if ((bits & EVT_TIMEOUT) != 0u)
+                {
+                    WashingSM_ProcessEvent(WASH_EVT_SPIN_DONE);
                 }
                 break;
             }

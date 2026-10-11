@@ -382,7 +382,7 @@ trong tài liệu này đều chạy trên board thật.</p>
 <td>Khi board không chạy như mong đợi</td>
 </tr>
 <tr>
-<td><a href="QA_LOG.md">QA_LOG.md</a></td>
+<td><a href="LEARNING_NOTES.html">LEARNING_NOTES.md</a> Phần D</td>
 <td>Hỏi–đáp trong quá trình xây dựng</td>
 <td>Tùy chọn</td>
 </tr>
@@ -1331,7 +1331,7 @@ stack sẽ sâu bao nhiêu — độ sâu phụ thuộc luồng rẽ nhánh, đ�
 hàm thư viện gọi lồng nhau (<code>sprintf()</code> là thủ phạm kinh điển, ngốn hàng trăm
 byte stack). <code>xTaskCreate(..., 128, ...)</code> với compiler chỉ là một con số nguyên.
 Đây là <strong>lỗi runtime, không phải lỗi compile-time</strong> — đã bàn ở
-<a href="QA_LOG.md">QA_LOG Session 07 Q4</a>.</p>
+<a href="LEARNING_NOTES.html">LEARNING_NOTES Phần D, Session 07 Q4</a>.</p>
 <p><strong>Cách phòng trong thực tế:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -2305,7 +2305,7 @@ Lệnh đó đi đâu? Khi chu trình kết thúc, máy có tự khởi động 
 <p><strong>Bỏ dòng đó đi thì chuyện gì xảy ra?</strong> Máy vào <code>FINISH</code>, ngay lập tức đọc được
 lệnh cũ còn kẹt trong queue, và tự nhảy về <code>IDLE</code> — người dùng thấy màn hình
 <code>FINISHED</code> loé lên rồi biến mất, không kịp đọc. <strong>Đó chính là Bug #10 của
-project</strong>, ghi ở <a href="QA_LOG.md">QA_LOG Session 08</a>.</p>
+project</strong>, ghi ở <a href="LEARNING_NOTES.html">LEARNING_NOTES Phần D, Session 08</a>.</p>
 <p>Bài học mang được sang project khác: <strong>queue nhớ mọi thứ bạn gửi, kể cả những
 thứ đã hết ý nghĩa.</strong> Khi hệ thống đổi chế độ hoạt động, phải tự hỏi: <em>&quot;dữ liệu
 đang nằm chờ trong queue có còn đúng cho chế độ mới không?&quot;</em> Nếu không, phải chủ
@@ -2575,7 +2575,7 @@ nội dung <strong>Tầng 6</strong>.</p>
 <li>Bảng API Queue đầy đủ, cột &quot;gọi được từ ISR?&quot; → <a href="LEARNING_NOTES.html">LEARNING_NOTES §C.1</a></li>
 <li>Vì sao chọn Queue cho kênh này, Event Group cho kênh kia → <a href="../PROJECT_PROGRESS.md">PROJECT_PROGRESS.md</a> mục TD-02</li>
 <li>Cấu trúc bên trong của Queue, chi phí RAM thực tế → <a href="LEARNING_NOTES.html">LEARNING_NOTES §1.1</a> (Event Group, cùng nguyên lý danh sách task chờ)</li>
-<li>Bug #10 — lệnh tồn đọng trong queue → <a href="QA_LOG.md">QA_LOG Session 08</a></li>
+<li>Bug #10 — lệnh tồn đọng trong queue → <a href="LEARNING_NOTES.html">LEARNING_NOTES Phần D, Session 08</a></li>
 </ul>
 <hr>
 <hr>

@@ -166,6 +166,41 @@ the SystemView timeline.
 
 ## Current Focus
 
+### Code Fix — EVT_ERROR wins over normal events; stale EVT_TIMEOUT cleared per phase `[DONE, NOT HARDWARE-TESTED]` 2026-10-11
+
+**Goal:** Remove two ways the shared event bits could mislead the state machine, found
+while studying `xTimerStart/xTimerStop` and `xEventGroupWaitBits` (LEARNING_NOTES Phần D, Session 19).
+
+**Files changed:** `App/WashingManager/Src/washing_manager.c`. Docs: `docs/SYSTEM_DIAGRAMS.md`
+§8 (timer diagram redrawn: `xTimerQueue` is now a node, Prio 3 > 2 and the
+expired-before-commands order are shown, `xTimerStop` path added; function names fixed);
+`docs/QA_LOG.md` merged into `docs/LEARNING_NOTES.md` as Phần D.
+
+**What changed:**
+
+1. **EVT_ERROR is tested first** in FILL_WATER / WASHING / DRAIN / SPIN. Before, ERROR was
+   the *last* branch everywhere, so `EVT_ERROR` arriving together with `EVT_TIMEOUT` or
+   `EVT_WATER_FULL` was swallowed: `xClearOnExit` clears the whole wait mask, and only
+   the first matching `if` ran.
+2. **New helper `Manager_StartPhaseTimer()`** clears `EVT_TIMEOUT` and then starts the
+   phase timer. Replaces the four bare `xTimerStart()` calls in the entry-actions.
+
+**Why:** all four timers share one bit, so a leftover `EVT_TIMEOUT` from the previous
+phase is indistinguishable from the new phase finishing.
+
+**Known residual (documented in the helper's comment):** `xTimerStop()` only queues a
+command and the timer service task handles an already-expired timer *before* its command
+queue, so an old timer expiring in that gap can still set the bit after the clear. Closing
+it fully needs one event bit per timer. `xTimerStart()` return value is still unchecked
+(timer queue full → silent drop); what to do on failure is a design decision, not made yet.
+
+**Verification:** build OK (`Freertos.elf`, text 37856). Not flashed.
+
+**What I should learn from it:** the order of an `if / else if` chain over event bits is
+an implicit priority table; and `xTimerStop` is a request, not a barrier.
+
+---
+
 ### Code Change — water-level bit made level-style; fill behaviour clarified `[DONE, NOT HARDWARE-TESTED]` 2026-10-10
 
 **Goal:** Match real machine behaviour for the *inlet* valve: it stays open until the
@@ -335,7 +370,7 @@ separate pins.
 - `docs/LEARNING_NOTES.md` — "Design: Debounce" rewritten; old mechanism kept
   collapsed for historical comparison; the "dead macro" note marked resolved.
 
-**Rejected alternatives** (full reasoning in `QA_LOG.md` Session 13): comparing
+**Rejected alternatives** (full reasoning in `LEARNING_NOTES.md` Phần D, Session 13): comparing
 against the last *accepted event* rather than the last *edge* (lets the
 release-bounce burst through after a long hold); re-reading the pin level on PD2
 (risks rejecting a real press during press bounce).
@@ -382,7 +417,7 @@ has never used an RTOS can reach full understanding of this project.
 primitive (Part A) and by build chronology (Part B). Both orders assume prior
 knowledge. No document told a newcomer where to start.
 
-**Design rules adopted** (full rationale in `QA_LOG.md` Session 12):
+**Design rules adopted** (full rationale in `LEARNING_NOTES.md` Phần D, Session 12):
 problem-before-primitive · show the naive solution failing first · quote real
 repo code with `file:line` · every level must be observable on the board ·
 predict-then-measure · one new concept per level · stay shallow here and link
@@ -705,7 +740,7 @@ After a full Wash cycle reaches `FINISH`, the machine stops responding to button
   Fixed them so the header stops teaching the wrong thing.
 - **Files changed:**
   - [`app_events.h`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/App/Common/Inc/app_events.h)
-  - [`QA_LOG.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/QA_LOG.md) (Session 09 added)
+  - [`LEARNING_NOTES.md`](file:///c:/Users/Dell/STM32CubeIDE/workspace_1.19.0/Freertos/docs/LEARNING_NOTES.md) Phần D (Session 09 added; formerly `QA_LOG.md`)
 - **What changed:**
   - `EVT_TIMEOUT` comment claimed the timer callback sets the bit *"from ISR
     context via `xEventGroupSetBitsFromISR()`"*. Corrected: `Timer_PhaseCallback()`

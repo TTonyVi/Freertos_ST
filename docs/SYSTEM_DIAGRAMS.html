@@ -784,14 +784,16 @@ cách khắc phục trong <code>App/BSP/Src/bsp_button.c</code>.</p>
 <div class="dg-slot"><figure class="diagram" data-src="flowchart LR
     subgraph WashMgr[&quot;WashingManager Task (Prio=3)&quot;]
         direction TB
-        ENA[&quot;xTimerStart(xWashTimer, 20s)\ncalled from onEnterWashing()&quot;]
+        ENA[&quot;Manager_OnEnterWashing()\n→ Manager_StartPhaseTimer(xWashTimer)\nclear EVT_TIMEOUT, rồi xTimerStart(…, 0)&quot;]
         WAIT_T[&quot;xEventGroupWaitBits\n(EVT_TIMEOUT | EVT_ERROR)\nBLOCKED&quot;]
-        PROC[&quot;WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\n→ WASHING → DRAIN&quot;]
+        PROC[&quot;WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\nWASHING → DRAIN\n→ Manager_OnEnterDrain()\n→ xTimerStart(xDrainTimer)&quot;]
     end
+
+    TQ[(&quot;xTimerQueue (nội bộ timers.c)\ndài 10, FIFO\nlệnh START / STOP / RESET&quot;)]
 
     subgraph TimerSvc[&quot;Timer Service Task (Prio=2, internal FreeRTOS)&quot;]
         direction TB
-        COUNT[&quot;Tick counter\n20000 ms elapsed&quot;]
+        LOOP[&quot;prvTimerTask\n1. xử lý timer đã HẾT HẠN\n2. rồi đọc lệnh trong queue\nrảnh thì block trên queue\ntới lần hết hạn gần nhất&quot;]
         CB[&quot;Timer_PhaseCallback()\ncalled by Timer Service Task\n─────────────────────\n(void)xTimer;\nxEventGroupSetBits(EVT_TIMEOUT)&quot;]
     end
 
@@ -799,17 +801,25 @@ cách khắc phục trong <code>App/BSP/Src/bsp_button.c</code>.</p>
         BIT[&quot;Bit2: EVT_TIMEOUT\n0 → 1&quot;]
     end
 
-    ENA --&gt;|&quot;posts timer command\nto timer queue&quot;| COUNT
-    COUNT --&gt;|&quot;calls callback&quot;| CB
+    ENA --&gt;|&quot;xTimerStart: chỉ GỬI LỆNH\n(Prio 3 &gt; 2 nên timer task chưa chạy)&quot;| TQ
+    TQ --&gt;|&quot;timer task chạy khi\nmanager đã block&quot;| LOOP
+    LOOP --&gt;|&quot;timer hết hạn\n(one-shot: sang dormant)\ncalls callback&quot;| CB
     CB --&gt;|&quot;xEventGroupSetBits (plain, KHÔNG phải FromISR)\nTimer Svc Task là task thật, không phải ISR&quot;| BIT
     BIT --&gt;|&quot;unblocks WashingManager\nif waiting on EVT_TIMEOUT&quot;| WAIT_T
     WAIT_T --&gt; PROC
-    PROC --&gt;|&quot;onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)&quot;| ENA
+    PROC -.-&gt;|&quot;nhánh EVT_ERROR: xTimerStop\n(cũng chỉ là lệnh vào queue,\nxử lý SAU timer đã hết hạn)&quot;| TQ
 
     style CB fill:#4a3b00,stroke:#d4a72c,color:#ffffff
     style BIT fill:#1b4332,stroke:#2ea043,color:#ffffff
     style WAIT_T fill:#0d3b66,stroke:#388bfd,color:#ffffff
+    style TQ fill:#3b1f5e,stroke:#a371f7,color:#ffffff
 "></figure></div>
+<p><strong>Điểm cần nhớ từ sơ đồ:</strong></p>
+<ul>
+<li><code>xTimerStart</code> / <code>xTimerStop</code> <strong>không</strong> thao tác trực tiếp lên timer; chúng chỉ đẩy một lệnh vào <code>xTimerQueue</code> (<code>timers.c:478</code>). Timer Service Task là bên duy nhất đọc queue và giữ danh sách timer.</li>
+<li>Mỗi vòng lặp của <code>prvTimerTask</code>, timer đã hết hạn được xử lý <strong>trước</strong>, lệnh trong queue đọc <strong>sau</strong> (<code>timers.c:774-777</code>). Vì vậy <code>xTimerStop</code> có thể đến muộn một nhịp so với một timer vừa hết hạn, và <code>EVT_TIMEOUT</code> mồ côi có thể xuất hiện. <code>Manager_StartPhaseTimer()</code> thu hẹp, nhưng chưa đóng hẳn, cửa sổ này.</li>
+<li>Cả 4 timer dùng chung một callback và một bit, nên bit không cho biết timer nào nổ; chỉ state hiện tại phân biệt.</li>
+</ul>
 <hr>
 <h2 id="9-task-blocking-map--mỗi-task-đang-chờ-gì">9. Task Blocking Map — Mỗi Task Đang Chờ Gì<a class="anchor" href="#9-task-blocking-map--mỗi-task-đang-chờ-gì" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Bảng này dùng để debug: nếu chương trình treo, xem task nào đang block và tại sao.</p>

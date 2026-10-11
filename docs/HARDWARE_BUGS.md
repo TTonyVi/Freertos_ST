@@ -525,7 +525,7 @@ của `DisplayMsg_t`. Hướng đã chọn khác cả hai phương án (a)/(b) �
   `BTN_EVENT_CONFIRM → CMD_CONFIRM`; `s_statusCache` bị xoá.
 - Hệ quả có chủ ý: lúc đang chạy chu trình, nút bị bỏ qua (manager chỉ đọc
   `xCommandQueue` ở IDLE/FINISH/ERROR).
-Phân tích đầy đủ: START_HERE Tầng 3 §3.6, QA_LOG Session 16. Các đoạn mã trong mục này
+Phân tích đầy đủ: START_HERE Tầng 3 §3.6, LEARNING_NOTES Phần D, Session 16. Các đoạn mã trong mục này
 là bản **cũ** (`s_statusCache`, `CMD_START_WASH/SPIN`) — giữ lại làm lịch sử.
 
 ---

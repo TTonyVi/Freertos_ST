@@ -23,7 +23,7 @@ trong tài liệu này đều chạy trên board thật.
 | [PROJECT_SPEC.md](../PROJECT_SPEC.md) | Đặc tả yêu cầu | Khi cần biết "hệ thống *phải* làm gì" |
 | [GPIO_CONFIG.md](GPIO_CONFIG.md) | Cấu hình từng chân, cách đấu dây | Khi lắp mạch ở Tầng 0 |
 | [HARDWARE_BUGS.md](HARDWARE_BUGS.md) | Nhật ký các bug phần cứng thật đã gặp | Khi board không chạy như mong đợi |
-| [QA_LOG.md](QA_LOG.md) | Hỏi–đáp trong quá trình xây dựng | Tùy chọn |
+| [LEARNING_NOTES.md](LEARNING_NOTES.md) Phần D | Hỏi–đáp trong quá trình xây dựng | Tùy chọn |
 
 Quy tắc: **một sự thật chỉ nằm ở một chỗ.** File này cố tình *nông* — hết phần
 cần thiết để hiểu code là dừng, phần sâu trỏ sang LEARNING_NOTES.
@@ -756,7 +756,7 @@ stack sẽ sâu bao nhiêu — độ sâu phụ thuộc luồng rẽ nhánh, đ�
 hàm thư viện gọi lồng nhau (`sprintf()` là thủ phạm kinh điển, ngốn hàng trăm
 byte stack). `xTaskCreate(..., 128, ...)` với compiler chỉ là một con số nguyên.
 Đây là **lỗi runtime, không phải lỗi compile-time** — đã bàn ở
-[QA_LOG Session 07 Q4](QA_LOG.md).
+[LEARNING_NOTES Phần D, Session 07 Q4](LEARNING_NOTES.md).
 
 **Cách phòng trong thực tế:**
 
@@ -1514,7 +1514,7 @@ Vì sao? Vì `Manager_OnEnterFinish()` gọi
 **Bỏ dòng đó đi thì chuyện gì xảy ra?** Máy vào `FINISH`, ngay lập tức đọc được
 lệnh cũ còn kẹt trong queue, và tự nhảy về `IDLE` — người dùng thấy màn hình
 `FINISHED` loé lên rồi biến mất, không kịp đọc. **Đó chính là Bug #10 của
-project**, ghi ở [QA_LOG Session 08](QA_LOG.md).
+project**, ghi ở [LEARNING_NOTES Phần D, Session 08](LEARNING_NOTES.md).
 
 Bài học mang được sang project khác: **queue nhớ mọi thứ bạn gửi, kể cả những
 thứ đã hết ý nghĩa.** Khi hệ thống đổi chế độ hoạt động, phải tự hỏi: *"dữ liệu
@@ -1756,7 +1756,7 @@ nội dung **Tầng 6**.
 - Bảng API Queue đầy đủ, cột "gọi được từ ISR?" → [LEARNING_NOTES §C.1](LEARNING_NOTES.md)
 - Vì sao chọn Queue cho kênh này, Event Group cho kênh kia → [PROJECT_PROGRESS.md](../PROJECT_PROGRESS.md) mục TD-02
 - Cấu trúc bên trong của Queue, chi phí RAM thực tế → [LEARNING_NOTES §1.1](LEARNING_NOTES.md) (Event Group, cùng nguyên lý danh sách task chờ)
-- Bug #10 — lệnh tồn đọng trong queue → [QA_LOG Session 08](QA_LOG.md)
+- Bug #10 — lệnh tồn đọng trong queue → [LEARNING_NOTES Phần D, Session 08](LEARNING_NOTES.md)
 
 ---
 ---

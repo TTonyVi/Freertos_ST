@@ -511,14 +511,16 @@ flowchart TB
 flowchart LR
     subgraph WashMgr["WashingManager Task (Prio=3)"]
         direction TB
-        ENA["xTimerStart(xWashTimer, 20s)\ncalled from onEnterWashing()"]
+        ENA["Manager_OnEnterWashing()\n→ Manager_StartPhaseTimer(xWashTimer)\nclear EVT_TIMEOUT, rồi xTimerStart(…, 0)"]
         WAIT_T["xEventGroupWaitBits\n(EVT_TIMEOUT | EVT_ERROR)\nBLOCKED"]
-        PROC["WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\n→ WASHING → DRAIN"]
+        PROC["WashingSM_ProcessEvent\n(WASH_EVT_WASH_DONE)\nWASHING → DRAIN\n→ Manager_OnEnterDrain()\n→ xTimerStart(xDrainTimer)"]
     end
+
+    TQ[("xTimerQueue (nội bộ timers.c)\ndài 10, FIFO\nlệnh START / STOP / RESET")]
 
     subgraph TimerSvc["Timer Service Task (Prio=2, internal FreeRTOS)"]
         direction TB
-        COUNT["Tick counter\n20000 ms elapsed"]
+        LOOP["prvTimerTask\n1. xử lý timer đã HẾT HẠN\n2. rồi đọc lệnh trong queue\nrảnh thì block trên queue\ntới lần hết hạn gần nhất"]
         CB["Timer_PhaseCallback()\ncalled by Timer Service Task\n─────────────────────\n(void)xTimer;\nxEventGroupSetBits(EVT_TIMEOUT)"]
     end
 
@@ -526,17 +528,25 @@ flowchart LR
         BIT["Bit2: EVT_TIMEOUT\n0 → 1"]
     end
 
-    ENA -->|"posts timer command\nto timer queue"| COUNT
-    COUNT -->|"calls callback"| CB
+    ENA -->|"xTimerStart: chỉ GỬI LỆNH\n(Prio 3 > 2 nên timer task chưa chạy)"| TQ
+    TQ -->|"timer task chạy khi\nmanager đã block"| LOOP
+    LOOP -->|"timer hết hạn\n(one-shot: sang dormant)\ncalls callback"| CB
     CB -->|"xEventGroupSetBits (plain, KHÔNG phải FromISR)\nTimer Svc Task là task thật, không phải ISR"| BIT
     BIT -->|"unblocks WashingManager\nif waiting on EVT_TIMEOUT"| WAIT_T
     WAIT_T --> PROC
-    PROC -->|"onEnterDrain() calls\nxTimerStart(xDrainTimer, 5s)"| ENA
+    PROC -.->|"nhánh EVT_ERROR: xTimerStop\n(cũng chỉ là lệnh vào queue,\nxử lý SAU timer đã hết hạn)"| TQ
 
     style CB fill:#4a3b00,stroke:#d4a72c,color:#ffffff
     style BIT fill:#1b4332,stroke:#2ea043,color:#ffffff
     style WAIT_T fill:#0d3b66,stroke:#388bfd,color:#ffffff
+    style TQ fill:#3b1f5e,stroke:#a371f7,color:#ffffff
 ```
+
+**Điểm cần nhớ từ sơ đồ:**
+
+- `xTimerStart` / `xTimerStop` **không** thao tác trực tiếp lên timer; chúng chỉ đẩy một lệnh vào `xTimerQueue` (`timers.c:478`). Timer Service Task là bên duy nhất đọc queue và giữ danh sách timer.
+- Mỗi vòng lặp của `prvTimerTask`, timer đã hết hạn được xử lý **trước**, lệnh trong queue đọc **sau** (`timers.c:774-777`). Vì vậy `xTimerStop` có thể đến muộn một nhịp so với một timer vừa hết hạn, và `EVT_TIMEOUT` mồ côi có thể xuất hiện. `Manager_StartPhaseTimer()` thu hẹp, nhưng chưa đóng hẳn, cửa sổ này.
+- Cả 4 timer dùng chung một callback và một bit, nên bit không cho biết timer nào nổ; chỉ state hiện tại phân biệt.
 
 ---
 
