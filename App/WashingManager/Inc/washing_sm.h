@@ -35,12 +35,12 @@
  *
  * The WashingManager task translates inbound signals into WashEvent_t:
  *
- *   CommandMsg_t  CMD_START_WASH  → WASH_EVT_START_WASH
- *   CommandMsg_t  CMD_START_SPIN  → WASH_EVT_START_SPIN
- *   Any CommandMsg_t, while in FINISH or ERROR → WASH_EVT_RESET
- *       (checked before the command is even decoded — see
- *       Manager_HandleCommand() in washing_manager.c. No producer ever
- *       builds CMD_RESET; UITask only sends CMD_START_WASH/CMD_START_SPIN.)
+ *   CMD_CONFIRM in IDLE, cursor on Wash  → WASH_EVT_START_WASH
+ *   CMD_CONFIRM in IDLE, cursor on Spin  → WASH_EVT_START_SPIN
+ *   CMD_CONFIRM in FINISH or ERROR       → WASH_EVT_RESET
+ *       (the cursor is owned by WashingManager, not carried in the command —
+ *       see Manager_HandleCommand() in washing_manager.c. CMD_NAVIGATE never
+ *       reaches the state machine; it only moves the cursor.)
  *   EVT_WATER_FULL (event group)  → WASH_EVT_WATER_FULL
  *   EVT_TIMEOUT   (event group)   → WASH_EVT_TIMEOUT or WASH_EVT_WASH_DONE
  *                                   depending on current state

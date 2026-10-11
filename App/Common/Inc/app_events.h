@@ -55,7 +55,13 @@
 /** Door sensor is closed; safe to run the machine. */
 #define EVT_DOOR_CLOSED     (1U << 0)
 
-/** Water level sensor has reached the target level. */
+/**
+ * Water level sensor reports full.  Level-style: SensorTask sets it while the
+ * sensor is full and clears it as soon as the sensor reports empty, so a stale
+ * bit from the previous cycle can never end the next FILL_WATER immediately.
+ * The inlet valve stays open until this bit arrives; the fill timer is only a
+ * safety timeout (FILL_WATER -> ERROR).
+ */
 #define EVT_WATER_FULL      (1U << 1)
 
 /**

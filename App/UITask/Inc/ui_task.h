@@ -1,17 +1,20 @@
 /**
  * @file    ui_task.h
- * @brief   UITask — button input handler and menu navigator.
+ * @brief   UITask — translates button gestures into commands.
  *
  * Responsibilities:
  *   - Initialises BSP button and registers the ISR callback.
  *   - Reads ButtonEvent_t from xButtonQueue (posted by the ISR callback).
- *   - Manages the menu cursor (menuIndex: 0 = Wash, 1 = Spin).
- *   - On long press, translates (menuIndex) into a CommandMsg_t and posts
- *     it to xCommandQueue for WashingManager.
+ *   - Renames each gesture into a Command_t and posts it to xCommandQueue
+ *     for WashingManager:
  *
- * Menu logic:
- *   Short press  →  advance menuIndex (cycles 0 → 1 → 0)
- *   Long press   →  send CommandMsg_t to xCommandQueue, do not change index
+ *       BTN_EVENT_NAVIGATE (PA0)  →  CMD_NAVIGATE
+ *       BTN_EVENT_CONFIRM  (PD2)  →  CMD_CONFIRM
+ *
+ * What it deliberately does NOT do:
+ *   - Keep the menu cursor. WashingManager owns it (single owner).
+ *   - Send anything to the OLED. WashingManager is the only producer of
+ *     DisplayMsg_t, so every screen update is complete and consistent.
  *
  * Priority: TASK_PRIORITY_UI (2) — below WashingManager, above Idle.
  */
@@ -22,8 +25,8 @@
 /**
  * @brief  UITask FreeRTOS task function.
  *
- * Initialises BSP button then blocks on xButtonQueue.
- * Each received ButtonEvent_t is processed against the current menuIndex.
+ * Initialises BSP button then blocks on xButtonQueue; each ButtonEvent_t
+ * received is forwarded as one Command_t.
  *
  * @param  pvParameters  Unused. Pass NULL to xTaskCreate().
  */

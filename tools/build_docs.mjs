@@ -35,6 +35,7 @@ const DOCS = [
   { src: 'docs/START_HERE.md',      out: 'docs/START_HERE.html',      label: 'Học FreeRTOS' },
   { src: 'docs/SYSTEM_DIAGRAMS.md', out: 'docs/SYSTEM_DIAGRAMS.html', label: 'Sơ đồ hệ thống' },
   { src: 'PROJECT_SPEC.md',         out: 'PROJECT_SPEC.html',         label: 'Đặc tả' },
+  { src: 'docs/LEARNING_NOTES.md',  out: 'docs/LEARNING_NOTES.html',  label: 'Ghi chú học tập' },
 ];
 
 const BRAND = 'Washing Machine Simulator';

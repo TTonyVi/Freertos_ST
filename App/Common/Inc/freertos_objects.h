@@ -52,8 +52,8 @@
  *   - Task Notification has a depth of 1: a second notification before
  *     the first is consumed would overwrite or be rejected. That would
  *     silently drop button presses or commands.
- *   - Task Notification carries a 32-bit scalar; CommandMsg_t and
- *     DisplayMsg_t are structs that cannot fit in 32 bits.
+ *   - Task Notification carries a 32-bit scalar; DisplayMsg_t (27 bytes)
+ *     cannot fit in 32 bits, and CommandMsg_t is a struct meant to grow.
  *   - Task Notification is 1:1 (named recipient). Event Group is used
  *     instead where multiple tasks may eventually wait on the same bit.
  * -------------------------------------------------------------------------- */
@@ -76,12 +76,13 @@ extern QueueHandle_t xButtonQueue;
  *
  * Producer : UITask         (via xQueueSend)
  * Consumer : WashingManager (via xQueueReceive)
- * Item     : CommandMsg_t  — command + mode
+ * Item     : CommandMsg_t  — a single Command_t (CMD_NAVIGATE / CMD_CONFIRM)
  * Depth    : COMMAND_QUEUE_LENGTH
  *
- * UITask translates button gestures and menu state into high-level
- * commands. WashingManager may be blocked on xSystemEvents when a
- * command arrives; the queue buffers it without loss.
+ * UITask renames button gestures into commands; it holds no menu state.
+ * WashingManager reads this queue only in IDLE / FINISH / ERROR — while a
+ * cycle runs it is blocked on xSystemEvents, so commands wait here and are
+ * discarded by xQueueReset() on the next return to a queue-reading state.
  */
 extern QueueHandle_t xCommandQueue;
 

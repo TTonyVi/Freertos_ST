@@ -6,7 +6,8 @@
  *   - Polls BSP sensor layer every SENSOR_TASK_PERIOD_MS (100 ms).
  *   - Sets EVT_DOOR_CLOSED in xSystemEvents when door is closed.
  *   - Clears EVT_DOOR_CLOSED when door opens mid-cycle (sets EVT_ERROR).
- *   - Sets EVT_WATER_FULL when water sensor reports full.
+ *   - Sets EVT_WATER_FULL while the water sensor reports full; clears it when
+ *     the sensor reports empty.
  *
  * Priority: TASK_PRIORITY_SENSOR (2) — same as UITask, below WashingManager.
  */

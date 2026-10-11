@@ -489,7 +489,7 @@ cửa, set `s_doorClosed = 0` qua debugger (Live Expressions) trong lúc máy
 
 ---
 
-## Bug #9 — OLED Hiển Thị Sai Status Khi Bấm Nút Giữa Chu Trình (CHƯA FIX)
+## Bug #9 — OLED Hiển Thị Sai Status Khi Bấm Nút Giữa Chu Trình (ĐÃ FIX 2026-10-10)
 
 ### Triệu chứng
 Nếu short-press B1 trong lúc máy đang chạy (`FILL_WATER`/`WASHING`/`DRAIN`/`SPIN`),
@@ -516,10 +516,17 @@ if (event == BTN_EVENT_NAVIGATE)
 
 ### Trạng thái
 
-**Đã phát hiện, chưa fix.** Đang chờ quyết định hướng xử lý — hai lựa chọn khả
-dĩ: (a) `WashingManager` gửi `statusText` mới nhất cho `UITask` biết (thêm
-kênh đồng bộ), hoặc (b) `UITask` không tự gửi display update khi máy không ở
-`IDLE`. Chưa quyết — ghi lại ở đây để không quên khi quay lại.
+**Đã fix (2026-10-10), chưa kiểm chứng trên board.** Nguyên nhân gốc là con trỏ
+menu có **hai chủ** (UITask và WashingManager) và UITask còn là nhà sản xuất thứ hai
+của `DisplayMsg_t`. Hướng đã chọn khác cả hai phương án (a)/(b) ở bản ghi gốc:
+- `WashingManager` giữ con trỏ (`s_menuIndex`) và là bên **duy nhất** dựng
+  `DisplayMsg_t` (`Manager_PostDisplay()`), chữ trạng thái luôn đúng.
+- `UITask` thành bộ dịch không trạng thái: `BTN_EVENT_NAVIGATE → CMD_NAVIGATE`,
+  `BTN_EVENT_CONFIRM → CMD_CONFIRM`; `s_statusCache` bị xoá.
+- Hệ quả có chủ ý: lúc đang chạy chu trình, nút bị bỏ qua (manager chỉ đọc
+  `xCommandQueue` ở IDLE/FINISH/ERROR).
+Phân tích đầy đủ: START_HERE Tầng 3 §3.6, QA_LOG Session 16. Các đoạn mã trong mục này
+là bản **cũ** (`s_statusCache`, `CMD_START_WASH/SPIN`) — giữ lại làm lịch sử.
 
 ---
 
@@ -568,7 +575,7 @@ crash hay treo — SM chỉ đơn giản đứng yên vì luôn nhận sai loạ
 
 ### Trạng thái
 
-**Đã phát hiện, đang chờ xác nhận hướng fix.** Hai phương án đã thảo luận:
+**Đã fix bằng Phương án A** (`Manager_HandleCommand()` diễn giải lệnh theo state; ở `FINISH`/`ERROR` mọi lệnh thành `WASH_EVT_RESET`). Từ 2026-10-10 chỉ còn một lệnh xác nhận `CMD_CONFIRM`, nên các tên `CMD_START_*` bên dưới là lịch sử. Hai phương án đã thảo luận:
 
 - **Phương án A (khuyến nghị):** `Manager_HandleCommand()` tự kiểm tra
   `WashingSM_GetState()` trước khi switch theo `cmd->command` — nếu đang ở
@@ -1125,7 +1132,7 @@ Flash lần 5 → Firmware RUNS ✓ → phát hiện Bug #5, #6, #7
 Flash lần 6 → All bugs fixed ✓
 Flash lần 7 → Test thủ công FILL_WATER → [Bug #8] PA0 shared với button → fix (door = software flag)
 Flash lần 8 → Test lại: đúng thiết kế (fill timeout 10s → ERROR khi chưa set s_waterFull) ✓
-             → phát hiện [Bug #9] OLED status cache — CHƯA fix, ghi lại chờ xử lý
+             → phát hiện [Bug #9] OLED status cache — đã fix 2026-10-10 (manager giữ con trỏ)
 Review code (chưa flash) → refactor bsp_button.c sang CubeMX-generated GPIO/NVIC
              → phát hiện [Bug #11] EXTI1 quên gọi handler, [Bug #12] PA0 thiếu cạnh FALLING,
                [Bug #13] .ioc/.c lệch NVIC priority → fix cả 3 trước khi flash lại

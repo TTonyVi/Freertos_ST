@@ -166,6 +166,81 @@ the SystemView timeline.
 
 ## Current Focus
 
+### Code Change — water-level bit made level-style; fill behaviour clarified `[DONE, NOT HARDWARE-TESTED]` 2026-10-10
+
+**Goal:** Match real machine behaviour for the *inlet* valve: it stays open until the
+water level sensor reports full. (This was already the code's behaviour — the docs
+presented the 10 s as a fill duration. It is only a safety timeout → ERROR.)
+
+**Misunderstanding, reverted:** I first read "van xả" as the *drain* valve and made
+DRAIN end on a new `EVT_WATER_EMPTY` bit instead of a timer. The user meant the inlet
+valve. That change was fully reverted (drain is timer-based again, 4 timers).
+
+**Files changed:** `sensor_task.c/.h` (clear `EVT_WATER_FULL` when the sensor reads
+empty), `app_events.h` (comment). Docs: START_HERE §0.3, PROJECT_SPEC §10 and
+Water Level section, SYSTEM_DIAGRAMS timer wording.
+
+**Real bug fixed on the way:** `EVT_WATER_FULL` was never cleared, and SensorTask
+re-set it every 100 ms while the sensor was full, so a leftover bit could end the next
+cycle's `FILL_WATER` immediately. Now the bit mirrors the sensor level.
+
+**Verification:** build, 0 warnings. Not flashed.
+
+**What I should learn from it:** confirm which object a request is about before
+editing; "the code already does it" was the right first check.
+
+---
+
+### Code Fix — WashingManager owns the menu cursor; UITask made stateless `[DONE, NOT HARDWARE-TESTED]` 2026-10-10
+
+**Goal:** Fix a real bug found while teaching Tầng 3: UITask showed a stale `IDLE`
+status line (its `s_statusCache` was never written) and kept its own menu cursor
+that diverged from the manager's copy, so the cursor jumped back at the next state
+change.
+
+**Root cause:** the menu cursor had two owners (UITask and WashingManager), and
+UITask also built `DisplayMsg_t` — a second producer for `xDisplayQueue`.
+
+**Files changed:**
+`App/Common/Inc/app_types.h` (`Command_t` = `CMD_NAVIGATE`, `CMD_CONFIRM`),
+`app_msg.h` (`CommandMsg_t` = one field), `app_config.h` (`MENU_ITEM_COUNT`),
+`App/UITask/{Src/ui_task.c, Inc/ui_task.h}` (pure translator, no state, no OLED),
+`App/WashingManager/Src/washing_manager.c` (`s_menuIndex`, `Manager_StatusText()`,
+`Manager_PostDisplay()`, `Manager_HandleCommand()`), plus comments in
+`washing_sm.h`, `washing_manager.h`, `freertos_objects.{h,c}`.
+
+**What changed:** WashingManager is now the only producer of `DisplayMsg_t` and
+the only owner of the cursor. `CMD_START_WASH/SPIN` collapsed into `CMD_CONFIRM`;
+the manager decides by cursor + state.
+
+**Behaviour change:** PA0/PD2 are ignored while a cycle runs (the manager only reads
+`xCommandQueue` in IDLE/FINISH/ERROR; stale commands are flushed by `xQueueReset`).
+
+**Verification:** clean build 0 warnings (`.data` 44 → 20 B); host-side test of the
+real manager + SM code, 37/37 checks, plus mutation tests that reintroduce each old
+bug (all caught). **Not flashed** — hardware scenarios still to run (see below).
+
+**Measured, not assumed:** arm-none-eabi-gcc uses `-fshort-enums` → enums are 1 byte;
+`ButtonEvent_t` 1, `CommandMsg_t` 1 (was 3), `DisplayMsg_t` 27, `StaticQueue_t` 80,
+`StaticEventGroup_t` 28, `StaticTimer_t` 44. My first "fix" of the comments used
+guessed sizes (12/36) and was wrong.
+
+**Docs synced:** START_HERE (Tầng 1–3, new §3.6 on this bug), SYSTEM_DIAGRAMS
+(§1 split into 1a/1b/1c, §5, §7), PROJECT_SPEC §7 diagram, LEARNING_NOTES §5.9.
+Mermaid pitfall: `;` inside a sequence-diagram note is a statement separator.
+
+**To test on the board:** (1) PA0 in IDLE moves the cursor and the status line stays
+`IDLE`; (2) PD2 starts Wash/Spin per cursor; (3) PA0/PD2 mid-cycle do nothing;
+(4) open door PD5 mid-wash → motor stops at once; (5) PD2 in FINISH/ERROR → IDLE.
+
+**Open question:** UITask is now a 1:1 enum rename — it could be removed (ISR posts
+`CMD_*` straight to `xCommandQueue`, deleting `xButtonQueue`). Not decided.
+
+**What I should learn from it:** one piece of state, one owner. Two copies of a
+value will drift; fix the ownership, not the symptom.
+
+---
+
 ### Docs Tooling — zoomable HTML docs `[DONE]` 2026-10-09
 
 **Goal:** Make the diagrams in the HTML docs readable — the architecture diagram
@@ -202,6 +277,16 @@ to zoom — and stop the three HTML files drifting away from their `.md` sources
   swallows page scrolling whenever the cursor passes over it.
 - Default view fits *width*, not the whole frame — tall diagrams (sequence
   diagrams) fitted whole become unreadably small.
+
+**Follow-on — `PROJECT_SPEC.md` §7 diagram (same day):** the section was a stack
+of 12 one-line paragraphs joined by `↓ ↑`, and omitted Software Timers although
+§9 names them as the source of `EVT_TIMEOUT`. Replaced with a top-to-bottom
+Mermaid diagram in three labelled lanes (user commands / system events /
+display) converging on WashingManager, colour-coded by object kind, plus a
+legend table. Iterated four times against real screenshots (width 1668 → 765 px;
+arrow crossing a lane title; nodes covering titles; bottom clipped on a 900 px
+screen). `viewer.js` gained a rule: a diagram only slightly taller than its
+frame is shrunk (max 30 %) to show whole instead of scrolling.
 
 **Verification:** drove real Chrome with puppeteer-core — 25/25 checks (zoom,
 pan, fullscreen, theme re-render, TOC, no JS errors). Static: 0 broken `#` links
@@ -453,11 +538,13 @@ Files changed: `App/BSP/Inc/bsp_button.h`, `App/BSP/Src/bsp_button.c`,
 `App/SensorTask/Src/sensor_task.c`, `Core/Src/stm32f4xx_it.c`,
 `App/UITask/Src/ui_task.c`, `Core/Src/main.c`.
 
-### Known open issue — Bug #9 (see HARDWARE_BUGS.md)
+### Resolved issue — Bug #9 (see HARDWARE_BUGS.md)
 
-`UITask`'s `s_statusCache` is initialized once to `"IDLE"` and never updated,
-so a short-press during a running cycle briefly overwrites the OLED status
-line with a stale `"IDLE"`. Not yet fixed — decision on approach pending.
+`UITask`'s `s_statusCache` was initialized once to `"IDLE"` and never updated, so a
+short-press during a running cycle overwrote the OLED status line with a stale
+`"IDLE"`. **Fixed 2026-10-10** by making WashingManager the sole owner of the menu
+cursor and the sole producer of `DisplayMsg_t` (see "Code Fix" at the top of Current
+Focus). Not yet verified on hardware.
 
 ### Resolved issue — Bug #10 (see HARDWARE_BUGS.md)
 

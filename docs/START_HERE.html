@@ -271,7 +271,7 @@ img { max-width: 100%; }
 <header class="topbar">
   <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
   <a class="brand" href="#top">Washing Machine Simulator</a>
-  <nav class="docnav" aria-label="Bộ tài liệu"><a href="START_HERE.html" aria-current="page">Học FreeRTOS</a><a href="SYSTEM_DIAGRAMS.html">Sơ đồ hệ thống</a><a href="../PROJECT_SPEC.html">Đặc tả</a></nav>
+  <nav class="docnav" aria-label="Bộ tài liệu"><a href="START_HERE.html" aria-current="page">Học FreeRTOS</a><a href="SYSTEM_DIAGRAMS.html">Sơ đồ hệ thống</a><a href="../PROJECT_SPEC.html">Đặc tả</a><a href="LEARNING_NOTES.html">Ghi chú học tập</a></nav>
   <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
 </header>
 <div class="layout" id="top">
@@ -322,7 +322,7 @@ img { max-width: 100%; }
           <li><a href="#33-ý-tưởng--queue" data-id="33-ý-tưởng--queue" title="3.3 Ý tưởng — Queue">3.3 Ý tưởng — Queue</a></li>
           <li><a href="#34-code-thật--ba-queue-của-project" data-id="34-code-thật--ba-queue-của-project" title="3.4 Code thật — ba queue của project">3.4 Code thật — ba queue của project</a></li>
           <li><a href="#35-thí-nghiệm" data-id="35-thí-nghiệm" title="3.5 Thí nghiệm">3.5 Thí nghiệm</a></li>
-          <li><a href="#36-một-lỗi-thật-trong-chính-project-này" data-id="36-một-lỗi-thật-trong-chính-project-này" title="3.6 Một lỗi thật trong chính project này">3.6 Một lỗi thật trong chính project này</a></li>
+          <li><a href="#36-một-lỗi-thật-trong-chính-project-này--và-cách-nó-được-sửa" data-id="36-một-lỗi-thật-trong-chính-project-này--và-cách-nó-được-sửa" title="3.6 Một lỗi thật trong chính project này — và cách nó được sửa">3.6 Một lỗi thật trong chính project này — và cách nó được sửa</a></li>
           <li><a href="#37-tự-kiểm-tra" data-id="37-tự-kiểm-tra" title="3.7 Tự kiểm tra">3.7 Tự kiểm tra</a></li>
           <li><a href="#38-đào-sâu" data-id="38-đào-sâu" title="3.8 Đào sâu">3.8 Đào sâu</a></li>
         </ul>
@@ -357,7 +357,7 @@ trong tài liệu này đều chạy trên board thật.</p>
 <td><strong>Bắt đầu ở đây.</strong> Đọc tuần tự</td>
 </tr>
 <tr>
-<td><a href="LEARNING_NOTES.md">LEARNING_NOTES.md</a></td>
+<td><a href="LEARNING_NOTES.html">LEARNING_NOTES.md</a></td>
 <td><strong>Cẩm nang tra cứu</strong> — kiến thức sâu từng primitive, đối chiếu source kernel</td>
 <td>Khi tầng nào đó nói &quot;đào sâu →&quot;</td>
 </tr>
@@ -682,7 +682,7 @@ vì phần cứng thường về muộn hơn phần mềm.</p>
 <tr>
 <td>Bơm nước (<code>FILL_WATER</code>)</td>
 <td><code>WASH_FILL_DURATION_MS</code></td>
-<td>10 giây (hết giờ mà chưa đầy → lỗi)</td>
+<td><strong>Không phải thời gian bơm.</strong> Van cấp mở <strong>đến khi cảm biến báo đầy</strong> (PD6); 10 giây chỉ là <em>hạn chót an toàn</em> — hết giờ mà chưa đầy → <code>ERROR</code></td>
 </tr>
 <tr>
 <td>Giặt (<code>WASHING</code>)</td>
@@ -701,8 +701,9 @@ vì phần cứng thường về muộn hơn phần mềm.</p>
 </tr>
 </tbody>
 </table></div>
-<p>Chu trình đầy đủ: <code>IDLE → FILL_WATER → WASHING → DRAIN → SPIN → FINISH</code>,
-khoảng 45 giây.</p>
+<p>Chu trình đầy đủ: <code>IDLE → FILL_WATER → WASHING → DRAIN → SPIN → FINISH</code>.
+<code>WASHING</code> + <code>DRAIN</code> + <code>SPIN</code> cộng lại 35 giây; <code>FILL_WATER</code> dài bao lâu tuỳ lúc bạn
+bấm PD6 (cảm biến báo đầy), tối đa 10 giây.</p>
 <h2 id="04-code-thật--hệ-thống-khởi-động-thế-nào">0.4 Code thật — hệ thống khởi động thế nào<a class="anchor" href="#04-code-thật--hệ-thống-khởi-động-thế-nào" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Chỉ cần đọc <strong>một</strong> đoạn ở tầng này, <a href="../Core/Src/main.c#L85-L125">Core/Src/main.c:85-125</a>:</p>
 <pre class="code" data-lang="c"><code class="hljs">HAL_Init();                     <span class="hljs-comment">/* 85  — khởi tạo HAL, flash, tick     */</span>
@@ -890,7 +891,7 @@ chỉ có một luồng thực thi.</li>
 ở Tầng 5.</p>
 <h2 id="07-đào-sâu">0.7 Đào sâu<a class="anchor" href="#07-đào-sâu" aria-label="Liên kết tới mục này">#</a></h2>
 <ul>
-<li>Vì sao clock là 16 MHz HSI chứ không phải thạch anh ngoài → <a href="LEARNING_NOTES.md">LEARNING_NOTES §5.4</a></li>
+<li>Vì sao clock là 16 MHz HSI chứ không phải thạch anh ngoài → <a href="LEARNING_NOTES.html">LEARNING_NOTES §5.4</a></li>
 <li>Toàn bộ sơ đồ hệ thống và 4 kịch bản chi tiết → <a href="SYSTEM_DIAGRAMS.html">SYSTEM_DIAGRAMS.md</a></li>
 </ul>
 <hr>
@@ -903,11 +904,11 @@ nhất của tài liệu. Không nắm tầng này thì mọi thứ sau chỉ l�
 <h2 id="11-hiện-tượng">1.1 Hiện tượng<a class="anchor" href="#11-hiện-tượng" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Quay lại Kịch bản A ở Tầng 0. Chạy tới bước 4 — máy <strong>đang giặt</strong>, đèn xanh lá
 sáng, đồng hồ đếm 20 giây.</p>
-<p>Bây giờ, <strong>trong lúc đang giặt</strong>, bấm nút <strong>PA0</strong>.</p>
-<p>Con trỏ trên OLED nhảy từ <code>&gt; Wash</code> xuống <code>&gt; Spin</code> <strong>ngay lập tức</strong>. Không có
-độ trễ. Trong khi đó đèn xanh lá vẫn sáng, chu trình giặt vẫn tiếp tục, và 20
-giây vẫn đếm đúng.</p>
-<p><strong>Hai việc đang xảy ra cùng lúc trên một CPU một nhân.</strong> Bằng cách nào?</p>
+<p>Bây giờ, <strong>trong lúc đang giặt</strong>, mở cửa: bấm nút <strong>PD5</strong>.</p>
+<p>Đèn xanh lá (motor) <strong>tắt gần như ngay lập tức</strong> và máy vào <code>ERROR</code>. Không phải
+chờ hết 20 giây. Vậy mà ngay trước đó, máy chỉ đang lặng lẽ đếm giờ.</p>
+<p><strong>Hai việc đang xảy ra cùng lúc trên một CPU một nhân:</strong> đếm 20 giây giặt, và
+canh cánh cửa. Bằng cách nào?</p>
 <h2 id="12-cách-ngây-thơ--superloop">1.2 Cách ngây thơ — superloop<a class="anchor" href="#12-cách-ngây-thơ--superloop" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Nếu chỉ biết bare-metal, bạn sẽ viết máy giặt thế này:</p>
 <pre class="code" data-lang="c"><code class="hljs"><span class="hljs-comment">/* ❌ Cách này KHÔNG dùng được — viết ra để thấy vấn đề */</span>
@@ -945,7 +946,7 @@ giây vẫn đếm đúng.</p>
 <tr>
 <td>1</td>
 <td><code>HAL_Delay(20000)</code> là <strong>busy-wait</strong> — CPU quay vòng rỗng 20 giây</td>
-<td>Bấm PA0 lúc đang giặt → <strong>không phản ứng gì trong 20 giây</strong>. Người dùng tưởng máy hỏng</td>
+<td>Bấm bất kỳ nút nào lúc đang giặt → <strong>không phản ứng gì trong 20 giây</strong>. Người dùng tưởng máy hỏng</td>
 </tr>
 <tr>
 <td>2</td>
@@ -1013,7 +1014,7 @@ trong vòng lặp.</li>
 <strong>priority riêng</strong>. Có thể hình dung là một &quot;chương trình mini&quot;. Project này có
 4 task.</p>
 <p><strong>② Trạng thái của task</strong> — mỗi task luôn ở đúng một trong các trạng thái sau
-(đầy đủ ở <a href="LEARNING_NOTES.md">LEARNING_NOTES §B.1</a>):</p>
+(đầy đủ ở <a href="LEARNING_NOTES.html">LEARNING_NOTES §B.1</a>):</p>
 <pre class="code" data-lang=""><code class="hljs">xTaskCreate() ──► [Ready]  ← sẵn sàng chạy, đang xếp hàng chờ CPU
                      │  scheduler chọn
                      ▼
@@ -1069,7 +1070,8 @@ câu này.</p>
 </table></div>
 <p><strong>Đây chính là câu trả lời cho hiện tượng ở §1.1.</strong> Trong 20 giây &quot;đang giặt&quot;,
 WashingManager không hề bận — nó đang <code>Blocked</code>, ngủ, trả CPU về cho hệ thống.
-UITask do đó phản ứng với nút bấm ngay lập tức.</p>
+SensorTask nhờ đó vẫn kiểm tra cánh cửa đều đặn, và khi cửa mở, WashingManager
+được đánh thức ngay để dừng motor.</p>
 <p>Nói cách khác: <strong>RTOS biến thời gian chờ từ thứ bị lãng phí thành tài nguyên
 dùng được.</strong></p>
 <h2 id="14-code-thật--task-đơn-giản-nhất-trong-project">1.4 Code thật — task đơn giản nhất trong project<a class="anchor" href="#14-code-thật--task-đơn-giản-nhất-trong-project" aria-label="Liên kết tới mục này">#</a></h2>
@@ -1088,8 +1090,10 @@ dùng được.</strong></p>
       xEventGroupSetBits(xSystemEvents, EVT_ERROR);
     }
 
-    <span class="hljs-keyword">if</span> (BSP_Sensor_IsWaterFull()) {
+    <span class="hljs-keyword">if</span> (BSP_Sensor_IsWaterFull()) {        <span class="hljs-comment">/* bit nước theo đúng mức cảm biến  */</span>
       xEventGroupSetBits(xSystemEvents, EVT_WATER_FULL);
+    } <span class="hljs-keyword">else</span> {
+      xEventGroupClearBits(xSystemEvents, EVT_WATER_FULL);
     }
 
     vTaskDelay(pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS));  <span class="hljs-comment">/* ④ ngủ 100 ms         */</span>
@@ -1137,23 +1141,23 @@ thấy tận mắt.</p>
 <h3 id="thí-nghiệm-a--bằng-chứng-của-blocked-không-sửa-code">Thí nghiệm A — bằng chứng của <code>Blocked</code> (không sửa code)<a class="anchor" href="#thí-nghiệm-a--bằng-chứng-của-blocked-không-sửa-code" aria-label="Liên kết tới mục này">#</a></h3>
 <ol>
 <li>Chạy Kịch bản A tới bước 4 (đèn 🟢 sáng, đang giặt).</li>
-<li>Trong lúc đèn xanh lá đang sáng, bấm <strong>PA0</strong> vài lần.</li>
+<li>Bấm <strong>PD5</strong> (mở cửa) và nhìn đèn xanh lá.</li>
 </ol>
-<p><strong>✍ Dự đoán trước:</strong> con trỏ OLED có nhảy không? Nhảy ngay hay phải đợi giặt
-xong? Chu kỳ giặt có bị kéo dài thêm không?</p>
-<p><strong>Kết quả cần thấy:</strong> con trỏ nhảy tức thì, đèn xanh lá không chớp, 20 giây vẫn
-đếm đúng.</p>
-<p><strong>Giải thích:</strong> WashingManager đang <code>Blocked</code>. Việc nó &quot;đang giặt&quot; không tiêu
-tốn CPU chút nào — LED xanh chỉ là một chân GPIO đã được bật rồi để đấy.</p>
+<p><strong>✍ Dự đoán trước:</strong> đèn xanh lá tắt sau bao lâu — ngay, hay phải đợi hết 20 giây
+của chu kỳ giặt? Máy vào trạng thái nào?</p>
+<p><strong>Kết quả cần thấy:</strong> đèn xanh lá tắt gần như ngay (chưa tới một phần năm giây),
+máy vào <code>ERROR</code>. Không có chuyện lồng vẫn quay nốt phần giặt còn lại.</p>
+<p><strong>Giải thích:</strong> WashingManager đang <code>Blocked</code> — việc nó &quot;đang giặt&quot; không tiêu
+tốn CPU chút nào, LED xanh chỉ là một chân GPIO đã được bật rồi để đấy. Cũng
+chính vì nó chỉ <em>ngủ chờ</em> chứ không <em>bận đếm</em>, SensorTask (cứ 100 ms đọc cửa một
+lần) mới có CPU để thấy cửa mở, và WashingManager được đánh thức ngay để dừng
+motor. Đối chiếu với superloop ở §1.2, dòng 2: <em>&quot;lồng vẫn quay tiếp 20 giây rồi
+máy mới biết&quot;</em> — đây chính là điều RTOS đã chữa.</p>
 <blockquote>
-<p>⚠ <strong>Bạn sẽ thấy thêm một thứ mà tài liệu này chưa giải thích:</strong> dòng trạng thái
-dưới cùng của OLED đổi từ <code>WASHING</code> thành <code>IDLE</code> ngay khi bạn bấm PA0, dù máy
-vẫn đang giặt (đèn xanh lá vẫn sáng, 20 giây vẫn chạy). <strong>Đây là một lỗi thật
-của project, không phải hành vi đúng.</strong> Đừng bận tâm ở tầng này — nguyên nhân
-nằm ở cách hai task trao đổi dữ liệu, và Tầng 3 sẽ mổ xẻ nó tới tận gốc.</p>
-<p>Hãy coi đây là bài tập đọc code đầu tiên: đèn LED vẫn đúng nhưng chữ trên màn
-hình lại sai. Điều đó nói lên <strong>hai thứ đó được điều khiển bởi hai đường khác
-nhau.</strong> Đường nào?</p>
+<p><strong>Thử thêm:</strong> vẫn trong lúc đang giặt, bấm <strong>PA0</strong> vài lần. Không có gì xảy ra —
+con trỏ menu đứng im. Đó là <strong>chủ ý thiết kế</strong>: WashingManager chỉ đọc nút bấm
+khi máy rảnh (<code>IDLE</code>, <code>FINISH</code>, <code>ERROR</code>). Vì sao nó chỉ đọc nút ở những lúc đó,
+và nút bấm đi qua những đâu trước khi tới nó, là nội dung của Tầng 3.</p>
 </blockquote>
 <h3 id="thí-nghiệm-b--phá-hệ-thống-bằng-hal_delay">Thí nghiệm B — phá hệ thống bằng <code>HAL_Delay()</code><a class="anchor" href="#thí-nghiệm-b--phá-hệ-thống-bằng-hal_delay" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Đây là thí nghiệm quan trọng nhất của tầng. Bạn sẽ <strong>cố tình làm hỏng</strong> hệ thống.</p>
@@ -1209,7 +1213,7 @@ task Ready có priority cao nhất&quot;</em> cho từng task:</p>
 <td>UITask</td>
 <td><strong>2</strong></td>
 <td>✅ Vẫn chạy</td>
-<td><strong>Bằng</strong> priority với SensorTask. Project bật <code>configUSE_TIME_SLICING = 1</code> (<a href="LEARNING_NOTES.md">LEARNING_NOTES §C.2</a>) nên hai task cùng mức chia nhau CPU theo vòng, mỗi tick đổi phiên. Nút bấm vẫn ăn</td>
+<td><strong>Bằng</strong> priority với SensorTask. Project bật <code>configUSE_TIME_SLICING = 1</code> (<a href="LEARNING_NOTES.html">LEARNING_NOTES §C.2</a>) nên hai task cùng mức chia nhau CPU theo vòng, mỗi tick đổi phiên. Nút bấm vẫn ăn</td>
 </tr>
 <tr>
 <td>OLEDTask</td>
@@ -1304,7 +1308,7 @@ DMA), không dùng task.</p>
 <p>Hệ quả kèm theo: <code>vTaskDelay(100)</code> gọi trong vòng lặp sẽ <strong>trôi nhịp</strong> (drift),
 vì thời gian xử lý của thân vòng lặp cộng dồn vào chu kỳ. Muốn chu kỳ đều tuyệt
 đối thì dùng <code>vTaskDelayUntil()</code> — so sánh chi tiết ở
-<a href="LEARNING_NOTES.md">LEARNING_NOTES §B.4</a>. SensorTask dùng <code>vTaskDelay</code> là chấp
+<a href="LEARNING_NOTES.html">LEARNING_NOTES §B.4</a>. SensorTask dùng <code>vTaskDelay</code> là chấp
 nhận được vì nó chỉ cần &quot;khoảng 100 ms&quot;, không cần chính xác.</p>
 <hr>
 <p><strong>Câu 3. <code>xTaskCreate(..., 128, ...)</code> cấp bao nhiêu bytes stack? Cấp thiếu thì
@@ -1352,9 +1356,9 @@ bản, rồi đo bằng high-water-mark và cắt xuống — chứ <strong>khô
 đầu</strong>.</p>
 <h2 id="17-đào-sâu">1.7 Đào sâu<a class="anchor" href="#17-đào-sâu" aria-label="Liên kết tới mục này">#</a></h2>
 <ul>
-<li>Scheduler chọn task ở chỗ nào trong source kernel → <a href="LEARNING_NOTES.md">LEARNING_NOTES §5.8</a></li>
-<li>SysTick, tick rate, độ chính xác thực tế của <code>vTaskDelay</code> → <a href="LEARNING_NOTES.md">LEARNING_NOTES §5.1–§5.7</a></li>
-<li><code>vTaskDelay</code> vs <code>vTaskDelayUntil</code> (hiện tượng trôi nhịp) → <a href="LEARNING_NOTES.md">LEARNING_NOTES §B.4</a></li>
+<li>Scheduler chọn task ở chỗ nào trong source kernel → <a href="LEARNING_NOTES.html">LEARNING_NOTES §5.8</a></li>
+<li>SysTick, tick rate, độ chính xác thực tế của <code>vTaskDelay</code> → <a href="LEARNING_NOTES.html">LEARNING_NOTES §5.1–§5.7</a></li>
+<li><code>vTaskDelay</code> vs <code>vTaskDelayUntil</code> (hiện tượng trôi nhịp) → <a href="LEARNING_NOTES.html">LEARNING_NOTES §B.4</a></li>
 </ul>
 <hr>
 <hr>
@@ -1487,14 +1491,14 @@ lý do bốn task này tồn tại — mỗi task <strong>nằm chờ một th�
 <td><strong>3</strong></td>
 <td>256 w</td>
 <td>Lệnh từ người dùng <strong>hoặc</strong> sự kiện hệ thống — tùy trạng thái</td>
-<td><strong>Máy trạng thái</strong> + motor, van, đèn</td>
+<td><strong>Máy trạng thái</strong> + <strong>con trỏ menu</strong> + motor, van, đèn</td>
 </tr>
 <tr>
 <td><strong>UITask</strong></td>
 <td><strong>2</strong></td>
 <td>128 w</td>
 <td>Sự kiện nút bấm (do ISR đẩy tới)</td>
-<td>Con trỏ menu</td>
+<td>Không giữ trạng thái nào — chỉ đổi cử chỉ nút bấm thành lệnh</td>
 </tr>
 <tr>
 <td><strong>SensorTask</strong></td>
@@ -1597,13 +1601,13 @@ code cùng điều khiển một chân mà không biết về nhau. Gộp chung 
 <h2 id="24-code-thật">2.4 Code thật<a class="anchor" href="#24-code-thật" aria-label="Liên kết tới mục này">#</a></h2>
 <h3 id="a-mỗi-task-chờ-một-nguồn-khác-nhau">(a) Mỗi task chờ một nguồn khác nhau<a class="anchor" href="#a-mỗi-task-chờ-một-nguồn-khác-nhau" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Đây là bằng chứng trực tiếp cho tiêu chí 1. Bốn dòng, lấy từ bốn file khác nhau:</p>
-<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-comment">/* UITask — chờ nút bấm            (ui_task.c:57)      */</span>
+<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-comment">/* UITask — chờ nút bấm            (ui_task.c:49)      */</span>
 xQueueReceive(xButtonQueue, &amp;event, portMAX_DELAY);
 
-<span class="hljs-comment">/* OLEDTask — chờ yêu cầu vẽ       (oled_task.c:57)    */</span>
+<span class="hljs-comment">/* OLEDTask — chờ yêu cầu vẽ       (oled_task.c:55)    */</span>
 xQueueReceive(xDisplayQueue, &amp;msg, portMAX_DELAY);
 
-<span class="hljs-comment">/* WashingManager — chờ lệnh       (washing_manager.c:254) */</span>
+<span class="hljs-comment">/* WashingManager — chờ lệnh       (washing_manager.c:287) */</span>
 xQueueReceive(xCommandQueue, &amp;cmd, portMAX_DELAY);
 
 <span class="hljs-comment">/* SensorTask — không chờ ai, tự ngủ theo nhịp (sensor_task.c:34) */</span>
@@ -1618,7 +1622,7 @@ chỉ cần thấy: bốn task, bốn nguồn chờ khác nhau. Đó chính là 
 </blockquote>
 <h3 id="b-washingmanager-chờ-thứ-gì-tùy-theo-đang-ở-trạng-thái-nào">(b) WashingManager: chờ thứ gì tùy theo đang ở trạng thái nào<a class="anchor" href="#b-washingmanager-chờ-thứ-gì-tùy-theo-đang-ở-trạng-thái-nào" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Đây là chỗ đặc biệt nhất project. Vòng lặp chính của WashingManager
-(<a href="../App/WashingManager/Src/washing_manager.c#L239-L257">washing_manager.c:239-257</a>),
+(<a href="../App/WashingManager/Src/washing_manager.c#L272-L290">washing_manager.c:272-290</a>),
 rút gọn:</p>
 <pre class="code" data-lang="c"><code class="hljs"><span class="hljs-keyword">for</span> (;;)
 {
@@ -1674,18 +1678,28 @@ WashingManager thậm chí <strong>không thèm nghe</strong> sự kiện đó; 
 <td>Gửi lệnh vào <code>xCommandQueue</code></td>
 </tr>
 <tr>
+<td>Con trỏ menu</td>
+<td>WashingManager</td>
+<td>Gửi <code>CMD_NAVIGATE</code> vào <code>xCommandQueue</code></td>
+</tr>
+<tr>
 <td>Màn OLED + bus I2C1</td>
 <td>OLEDTask</td>
 <td>Gửi nội dung vào <code>xDisplayQueue</code></td>
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p><strong>Con trỏ menu từng có hai chủ</strong> — UITask giữ một bản, WashingManager giữ một
+bản khác — và hậu quả là một lỗi màn hình có thật. Câu chuyện đó ở Tầng 3 §3.6;
+hiện tại chỉ còn một bản, nằm trong WashingManager.</p>
+</blockquote>
 <p>Vì sao OLED phải có chủ: nếu hai task cùng gọi <code>ssd1306_UpdateScreen()</code>, hai
 giao dịch I2C sẽ đè lên nhau giữa chừng — màn hình hiện rác, hoặc bus treo. Cách
 chữa thông thường là dùng <strong>mutex</strong> để khóa. Nhưng project chọn cách rẻ hơn và
 an toàn hơn: <strong>chỉ cho đúng một task chạm vào</strong>. Không có tranh chấp thì không
 cần khóa.</p>
-<p>Nhìn lại <a href="../App/OLEDTask/Src/oled_task.c#L55-L59">oled_task.c:55-59</a>: OLEDTask
+<p>Nhìn lại <a href="../App/OLEDTask/Src/oled_task.c#L53-L57">oled_task.c:53-57</a>: OLEDTask
 chỉ có hai việc — nhận tin, vẽ. Nó <strong>không chứa một chút logic máy giặt nào</strong>.
 Đây gọi là <strong>pure renderer</strong>: nó không biết máy giặt là gì, nó chỉ biết vẽ cái
 người ta đưa cho.</p>
@@ -1715,7 +1729,7 @@ nữa — lần này có gì khác không?</p>
 </tr>
 <tr>
 <td>2</td>
-<td>Bấm <strong>PD6</strong> vài lần</td>
+<td>Bấm <strong>PD6</strong> hai lần (đầy rồi lại cạn)</td>
 <td>?</td>
 </tr>
 <tr>
@@ -1765,7 +1779,9 @@ chọn nguồn chờ, không phải bằng câu <code>if</code>.</strong></p>
 <p><em>(Chi tiết &quot;tin rơi vào hư không&quot; thực ra không hoàn toàn đúng — bit vẫn nằm
 trong event group và có thể gây hiệu ứng phụ ở trạng thái sau. Đó gọi là
 <strong>sticky flag</strong>, một cái bẫy thật của project này, phân tích đầy đủ ở
-<a href="LEARNING_NOTES.md">LEARNING_NOTES §3</a>. Tầng 4 sẽ nói tới.)</em></p>
+<a href="LEARNING_NOTES.html">LEARNING_NOTES §3</a>. Tầng 4 sẽ nói tới. Riêng bit nước hiện
+là bit <strong>theo mức</strong>: SensorTask xoá <code>EVT_WATER_FULL</code> ngay khi cảm biến báo cạn,
+nên bit cũ của chu trình trước không thể làm <code>FILL_WATER</code> kết thúc oan.)</em></p>
 <hr>
 <h3 id="thí-nghiệm-b--đổi-chân-motor-chứng-minh-lớp-bsp">Thí nghiệm B — đổi chân motor, chứng minh lớp BSP<a class="anchor" href="#thí-nghiệm-b--đổi-chân-motor-chứng-minh-lớp-bsp" aria-label="Liên kết tới mục này">#</a></h3>
 <p><strong>Bước 1 —</strong> mở <a href="../App/BSP/Src/bsp_motor.c#L40">bsp_motor.c:40</a>, sửa <strong>đúng một
@@ -1775,7 +1791,7 @@ dòng</strong>:</p>
 </code></pre>
 
 <p><strong>Bước 2 — ✍ dự đoán.</strong> Dữ kiện: PD13 vốn là van cấp nước (đèn cam). Thứ tự lệnh
-trong callback vào <code>WASHING</code> là <a href="../App/WashingManager/Src/washing_manager.c#L80-L86">washing_manager.c:80-86</a>:
+trong callback vào <code>WASHING</code> là <a href="../App/WashingManager/Src/washing_manager.c#L84-L90">washing_manager.c:84-90</a>:
 đóng van INLET <strong>trước</strong>, rồi mới bật motor.</p>
 <blockquote>
 <ul>
@@ -1874,11 +1890,11 @@ không liên quan gì tới nhau.</p>
 </tbody>
 </table></div>
 <p>Vì sao OLEDTask cần nhiều stack dù chẳng gấp gáp gì: nhìn chuỗi gọi hàm của nó
-ở <a href="../App/OLEDTask/Src/oled_task.c#L22-L41">oled_task.c:22-41</a> —
+ở <a href="../App/OLEDTask/Src/oled_task.c#L22-L39">oled_task.c:22-39</a> —
 <code>OLEDTask</code> → <code>OLED_Render()</code> → <code>BSP_OLED_DrawText()</code> → <code>ssd1306_WriteString()</code> →
 <code>ssd1306_WriteChar()</code> → ... xuống tới HAL I2C. Mỗi tầng gọi hàm đều đẩy thêm một
-khung stack. Cộng thêm biến cục bộ <code>DisplayMsg_t msg</code> (36 byte) nằm ngay trên
-stack của task (<a href="../App/OLEDTask/Src/oled_task.c#L53">oled_task.c:53</a>).</p>
+khung stack. Cộng thêm biến cục bộ <code>DisplayMsg_t msg</code> (27 byte) nằm ngay trên
+stack của task (<a href="../App/OLEDTask/Src/oled_task.c#L51">oled_task.c:51</a>).</p>
 <p>Ngược lại, SensorTask (<a href="../App/SensorTask/Src/sensor_task.c">sensor_task.c</a>) chỉ
 đọc hai chân GPIO và set vài bit — call chain nông, gần như không có biến cục
 bộ — nên 128 words là dư dùng.</p>
@@ -1891,13 +1907,13 @@ nào chạy trước?</strong></p>
 thiếu sót.</p>
 <p>Khi nhiều task cùng priority cùng <code>Ready</code>, FreeRTOS chạy chúng theo vòng
 (<em>round-robin</em>), mỗi task được một lát thời gian rồi nhường lượt — cơ chế này
-bật bởi <code>configUSE_TIME_SLICING = 1</code> (<a href="LEARNING_NOTES.md">LEARNING_NOTES §C.2</a>).
+bật bởi <code>configUSE_TIME_SLICING = 1</code> (<a href="LEARNING_NOTES.html">LEARNING_NOTES §C.2</a>).
 Task nào đi trước phụ thuộc trạng thái danh sách Ready tại thời điểm đó, tức là
 phụ thuộc lịch sử chạy trước đó.</p>
 <p><strong>Điều đó có nguy hiểm không? Không</strong> — vì hai task này <strong>không tranh chấp gì của
 nhau</strong>:</p>
 <ul>
-<li>UITask đọc <code>xButtonQueue</code>, ghi <code>xCommandQueue</code> và <code>xDisplayQueue</code>.</li>
+<li>UITask đọc <code>xButtonQueue</code>, ghi <code>xCommandQueue</code>.</li>
 <li>SensorTask đọc GPIO, ghi <code>xSystemEvents</code>.</li>
 <li>Không có biến chung, không có tài nguyên chung.</li>
 </ul>
@@ -2011,13 +2027,13 @@ bị trễ đúng bằng chu kỳ hỏi. Tầng 1 đã chỉ ra đây chính là
 bên bị mất trắng. Bug này tái hiện được khoảng một lần trong một nghìn, và biến
 mất khi bạn đặt breakpoint.</p>
 <p><strong>④ Struct bị đọc nửa vời — nguy hiểm nhất.</strong> Với dữ liệu nhiều trường:</p>
-<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-keyword">volatile</span> DisplayMsg_t g_display;   <span class="hljs-comment">/* 36 byte */</span>
+<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-keyword">volatile</span> DisplayMsg_t g_display;   <span class="hljs-comment">/* 27 byte */</span>
 </code></pre>
 
 <p>Task A ghi xong <code>menuIndex</code>, chưa kịp ghi <code>statusText</code> thì bị task B chen vào
 đọc. Task B nhận được <strong>một nửa dữ liệu mới ghép với một nửa dữ liệu cũ</strong> — một
 trạng thái chưa từng tồn tại trong ý định của ai cả. <code>volatile</code> không giúp được
-gì: nó không làm cho 36 byte trở nên nguyên tử.</p>
+gì: nó không làm cho 27 byte trở nên nguyên tử.</p>
 <p>Lỗi ④ là loại khiến kỹ sư mất hàng tuần: hệ thống chạy đúng 99.9 % thời gian,
 và cái 0.1 % còn lại không tài nào bắt được bằng debugger, vì dừng chương trình
 lại là race biến mất.</p>
@@ -2059,7 +2075,7 @@ quyết cả bốn lỗ hổng trên bằng bốn tính chất:</p>
 <pre class="code" data-lang="c"><code class="hljs">xQueueSend(xDisplayQueue, &amp;disp, <span class="hljs-number">0</span>);
 <span class="hljs-comment">/*                        ^^^^^                                    */</span>
 <span class="hljs-comment">/*  Truyền ĐỊA CHỈ vào hàm, nhưng FreeRTOS KHÔNG lưu địa chỉ đó.   */</span>
-<span class="hljs-comment">/*  Nó copy 36 byte từ địa chỉ đó vào vùng nhớ của queue NGAY LẬP  */</span>
+<span class="hljs-comment">/*  Nó copy 27 byte từ địa chỉ đó vào vùng nhớ của queue NGAY LẬP  */</span>
 <span class="hljs-comment">/*  TỨC, trong lúc hàm còn đang chạy. Sau khi hàm return, biến     */</span>
 <span class="hljs-comment">/*  `disp` của bạn không còn liên quan gì tới queue nữa.           */</span>
 </code></pre>
@@ -2068,12 +2084,12 @@ quyết cả bốn lỗ hổng trên bằng bốn tính chất:</p>
 bị thu hồi, dữ liệu vẫn an toàn trong queue. Nếu queue lưu con trỏ thì đây sẽ là
 lỗi dangling pointer kinh điển.</p>
 <p>Cái giá phải trả: mỗi lần gửi và mỗi lần nhận đều tốn một phép <code>memcpy</code>. Với
-<code>DisplayMsg_t</code> 36 byte trên Cortex-M4 thì không đáng kể. Với dữ liệu <strong>lớn</strong>
+<code>DisplayMsg_t</code> 27 byte trên Cortex-M4 thì không đáng kể. Với dữ liệu <strong>lớn</strong>
 (vài KB, ví dụ một buffer ảnh) thì mới cần cân nhắc gửi con trỏ — nhưng lúc đó
 bạn phải tự trả lời: ai cấp phát, ai giải phóng, và bên nhận đọc xong chưa?
 Queue theo giá trị không đặt ra câu hỏi nào trong ba câu đó.</p>
 <h2 id="34-code-thật--ba-queue-của-project">3.4 Code thật — ba queue của project<a class="anchor" href="#34-code-thật--ba-queue-của-project" aria-label="Liên kết tới mục này">#</a></h2>
-<p>Tạo tại <a href="../App/Common/Src/freertos_objects.c#L106-L127">freertos_objects.c:106-127</a>:</p>
+<p>Tạo tại <a href="../App/Common/Src/freertos_objects.c#L114-L134">freertos_objects.c:114-134</a>:</p>
 <pre class="code" data-lang="c"><code class="hljs">xButtonQueue  = xQueueCreate(BUTTON_QUEUE_LENGTH,  <span class="hljs-keyword">sizeof</span>(ButtonEvent_t));
 xCommandQueue = xQueueCreate(COMMAND_QUEUE_LENGTH, <span class="hljs-keyword">sizeof</span>(CommandMsg_t));
 xDisplayQueue = xQueueCreate(DISPLAY_QUEUE_LENGTH, <span class="hljs-keyword">sizeof</span>(DisplayMsg_t));
@@ -2098,7 +2114,7 @@ xDisplayQueue = xQueueCreate(DISPLAY_QUEUE_LENGTH, <span class="hljs-keyword">si
 <td><strong>ISR</strong> nút bấm</td>
 <td>UITask</td>
 <td>5</td>
-<td>4 byte</td>
+<td>1 byte</td>
 </tr>
 <tr>
 <td><code>xCommandQueue</code></td>
@@ -2106,18 +2122,28 @@ xDisplayQueue = xQueueCreate(DISPLAY_QUEUE_LENGTH, <span class="hljs-keyword">si
 <td>UITask</td>
 <td>WashingManager</td>
 <td>5</td>
-<td>12 byte</td>
+<td>1 byte</td>
 </tr>
 <tr>
 <td><code>xDisplayQueue</code></td>
 <td><code>DisplayMsg_t</code></td>
-<td>WashingManager <em>(và UITask — xem §3.6)</em></td>
+<td>WashingManager <em>(duy nhất — xem §3.6)</em></td>
 <td>OLEDTask</td>
 <td>5</td>
-<td>36 byte</td>
+<td>27 byte</td>
 </tr>
 </tbody>
 </table></div>
+<blockquote>
+<p><strong>Vì sao 1 / 1 / 27 mà không phải 4 / 4 / 36?</strong> Cột cuối là số <strong>đo thật</strong> bằng
+<code>arm-none-eabi-gcc</code> với đúng cờ biên dịch của project. Trình biên dịch này mặc
+định dùng <code>-fshort-enums</code>: một <code>enum</code> chiếm số byte nhỏ nhất đủ chứa giá trị
+(ở đây là 1), không phải 4 byte như một <code>int</code>. Nhiều tài liệu và ví dụ trên mạng
+ngầm giả định <code>sizeof(enum) == 4</code>; trên toolchain này điều đó <strong>sai</strong>, và cũng
+từng sai trong chính comment của project cho tới khi được đo lại. Quy tắc:
+<strong>kích thước kiểu dữ liệu thì đo, đừng đoán</strong> — một dòng
+<code>char (*p)[sizeof(T)] = 1;</code> làm trình biên dịch tự in ra con số.</p>
+</blockquote>
 <p>Ba queue tạo thành một <strong>dây chuyền một chiều</strong>:</p>
 <pre class="code" data-lang="text"><code class="hljs">  [Nút bấm]                                          [Màn OLED]
       │ ISR                                               ▲
@@ -2145,12 +2171,12 @@ tiếp của tiêu chí ownership ở Tầng 2 — và nó khiến toàn bộ lu
 <tr>
 <td><code>portMAX_DELAY</code></td>
 <td>Chờ vô hạn. Task <code>Blocked</code> tới khi có dữ liệu</td>
-<td>Mọi chỗ <strong>nhận</strong>: <a href="../App/UITask/Src/ui_task.c#L57">ui_task.c:57</a>, <a href="../App/OLEDTask/Src/oled_task.c#L57">oled_task.c:57</a>, <a href="../App/WashingManager/Src/washing_manager.c#L254">washing_manager.c:254</a></td>
+<td>Mọi chỗ <strong>nhận</strong>: <a href="../App/UITask/Src/ui_task.c#L49">ui_task.c:49</a>, <a href="../App/OLEDTask/Src/oled_task.c#L55">oled_task.c:55</a>, <a href="../App/WashingManager/Src/washing_manager.c#L287">washing_manager.c:287</a></td>
 </tr>
 <tr>
 <td><code>0</code></td>
 <td><strong>Không chờ.</strong> Queue đầy thì trả về <code>errQUEUE_FULL</code> ngay</td>
-<td>Mọi chỗ <strong>gửi</strong>: <a href="../App/UITask/Src/ui_task.c#L68">ui_task.c:68</a>, <a href="../App/UITask/Src/ui_task.c#L81">ui_task.c:81</a>, <code>Manager_PostDisplay</code></td>
+<td>Mọi chỗ <strong>gửi</strong> từ task: <a href="../App/UITask/Src/ui_task.c#L68">ui_task.c:68</a> (gửi lệnh), <a href="../App/WashingManager/Src/washing_manager.c#L184">washing_manager.c:184</a> (<code>Manager_PostDisplay</code>). Riêng ISR dùng bản <code>FromISR</code> ở <a href="../App/UITask/Src/ui_task.c#L32">ui_task.c:32</a></td>
 </tr>
 <tr>
 <td><code>pdMS_TO_TICKS(n)</code></td>
@@ -2169,11 +2195,11 @@ nghiêm trọng.</p>
 <p>Với timeout 0, cập nhật hiển thị bị <strong>rơi lặng lẽ</strong> khi quá tải. Đánh đổi này
 đúng vì màn hình là dữ liệu <em>tự làm mới</em>: bỏ một khung hình thì khung sau vẫn
 vẽ đúng. Ghi rõ trong comment ở
-<a href="../App/WashingManager/Src/washing_manager.c#L137-L142">washing_manager.c:137-142</a>.</p>
+<a href="../App/WashingManager/Src/washing_manager.c#L165-L173">washing_manager.c:165-173</a>.</p>
 <p>Quy tắc chung mang được sang project khác: <strong>bên gửi ở priority cao không bao
 giờ được block chờ bên nhận ở priority thấp.</strong></p>
 <h3 id="gửi-từ-isr-phải-dùng-hàm-khác">Gửi từ ISR phải dùng hàm khác<a class="anchor" href="#gửi-từ-isr-phải-dùng-hàm-khác" aria-label="Liên kết tới mục này">#</a></h3>
-<p><a href="../App/UITask/Src/ui_task.c#L32-L38">ui_task.c:32-38</a>:</p>
+<p><a href="../App/UITask/Src/ui_task.c#L29-L35">ui_task.c:29-35</a>:</p>
 <pre class="code" data-lang="c"><code class="hljs"><span class="hljs-type">static</span> <span class="hljs-type">void</span> <span class="hljs-title function_">Button_EventCallback</span><span class="hljs-params">(ButtonEvent_t event)</span> {
   BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
@@ -2191,37 +2217,39 @@ tồn tại <code>xHigherPriorityTaskWoken</code>, <code>portYIELD_FROM_ISR</cod
 <h3 id="thí-nghiệm-a--chứng-minh-queue-sao-chép-không-giữ-con-trỏ">Thí nghiệm A — chứng minh queue sao chép, không giữ con trỏ<a class="anchor" href="#thí-nghiệm-a--chứng-minh-queue-sao-chép-không-giữ-con-trỏ" aria-label="Liên kết tới mục này">#</a></h3>
 <p>Đây là thí nghiệm quyết định của tầng. Nếu bạn tin rằng &quot;truyền <code>&amp;disp</code> nghĩa là
 queue giữ địa chỉ của <code>disp</code>&quot; thì kết quả dưới đây sẽ sửa lại niềm tin đó.</p>
-<p><strong>Bước 1 —</strong> mở <a href="../App/UITask/Src/ui_task.c#L68">ui_task.c:68</a>, thêm <strong>một dòng
-ngay sau</strong> lệnh gửi:</p>
-<pre class="code" data-lang="c"><code class="hljs">      xQueueSend(xDisplayQueue, &amp;disp, <span class="hljs-number">0</span>);
-      disp.menuIndex = <span class="hljs-number">99u</span>;      <span class="hljs-comment">/* ← thí nghiệm, sẽ hoàn tác */</span>
+<p><strong>Bước 1 —</strong> mở <a href="../App/WashingManager/Src/washing_manager.c#L184">washing_manager.c:184</a>,
+trong hàm <code>Manager_PostDisplay()</code>, thêm <strong>một dòng ngay sau</strong> lệnh gửi:</p>
+<pre class="code" data-lang="c"><code class="hljs">    xQueueSend(xDisplayQueue, &amp;msg, <span class="hljs-number">0</span>);
+    msg.menuIndex = <span class="hljs-number">99u</span>;      <span class="hljs-comment">/* ← thí nghiệm, sẽ hoàn tác */</span>
+}
 </code></pre>
 
 <p><strong>Bước 2 — ✍ dự đoán.</strong> Nhớ rằng <code>OLED_Render()</code> vẽ con trỏ bằng
-<code>msg-&gt;menuIndex == 0u ? &quot;&gt; Wash&quot; : &quot;  Wash&quot;</code> (<a href="../App/OLEDTask/Src/oled_task.c#L32-L35">oled_task.c:32-35</a>),
+<code>msg-&gt;menuIndex == 0u ? &quot;&gt; Wash&quot; : &quot;  Wash&quot;</code> (<a href="../App/OLEDTask/Src/oled_task.c#L30-L33">oled_task.c:30-33</a>),
 nên <code>menuIndex = 99</code> sẽ khiến <strong>không dòng nào có dấu <code>&gt;</code></strong>.</p>
 <blockquote>
 <ul>
-<li>Bấm PA0. Con trỏ <code>&gt;</code> còn hiện không?</li>
-<li><code>disp</code> là biến cục bộ trong <code>while(1)</code> của UITask. Đến lúc OLEDTask
-(priority 1, thấp nhất) chạy tới, khung stack đó còn tồn tại không?</li>
+<li>Bấm PA0 lúc máy đang rảnh. Con trỏ <code>&gt;</code> còn hiện không?</li>
+<li><code>msg</code> là biến cục bộ của <code>Manager_PostDisplay()</code>. Hàm này <strong>đã return</strong> từ
+rất lâu trước khi OLEDTask (priority 1, thấp nhất) được chạy tới. Khung stack
+chứa <code>msg</code> lúc OLEDTask đọc queue còn tồn tại không?</li>
 </ul>
 </blockquote>
-<p><strong>Bước 3 —</strong> build, nạp, bấm PA0 vài lần.</p>
+<p><strong>Bước 3 —</strong> build, nạp, bấm PA0 vài lần (và thử cả một chu trình đầy đủ).</p>
 <h3 id="-dừng-lại--viết-dự-đoán-ra-giấy-xong-mới-đọc-tiếp-2">⛔ Dừng lại — viết dự đoán ra giấy xong mới đọc tiếp<a class="anchor" href="#-dừng-lại--viết-dự-đoán-ra-giấy-xong-mới-đọc-tiếp-2" aria-label="Liên kết tới mục này">#</a></h3>
 <h3 id="kết-quả-và-giải-thích-2">Kết quả và giải thích<a class="anchor" href="#kết-quả-và-giải-thích-2" aria-label="Liên kết tới mục này">#</a></h3>
-<p><strong>Con trỏ vẫn nhảy đúng.</strong> Dòng <code>disp.menuIndex = 99u;</code> không có một chút ảnh
-hưởng nào.</p>
-<p>Vì <code>xQueueSend()</code> đã <strong>copy 36 byte vào vùng nhớ riêng của queue ngay trong lúc
-hàm còn chạy</strong>. Khi hàm return, mọi liên hệ giữa biến <code>disp</code> và queue đã chấm
-dứt. Bạn sửa <code>disp</code> sau đó cũng như sửa một tờ giấy đã photo xong — bản photo
-không đổi.</p>
-<p>Câu hỏi thứ hai còn sắc hơn: <code>disp</code> nằm trên <strong>stack của UITask</strong>. UITask gửi
-xong thì quay lại đầu vòng lặp và <code>Blocked</code> trên <code>xButtonQueue</code>; khung stack
-chứa <code>disp</code> bị coi như rác và sẽ bị ghi đè bởi lần lặp sau. OLEDTask (priority</p>
-<ol>
-<li>có thể mãi tới vài chục mili-giây sau mới được chạy.</li>
-</ol>
+<p><strong>Con trỏ vẫn nhảy đúng.</strong> Dòng <code>msg.menuIndex = 99u;</code> không có một chút ảnh
+hưởng nào, kể cả trong một chu trình đầy đủ.</p>
+<p>Vì <code>xQueueSend()</code> đã <strong>copy 27 byte vào vùng nhớ riêng của queue ngay trong lúc
+hàm còn chạy</strong>. Khi hàm return, mọi liên hệ giữa biến <code>msg</code> và queue đã chấm
+dứt. Bạn sửa <code>msg</code> sau đó cũng như sửa một tờ giấy đã photo xong — bản photo
+không đổi. (Và <code>s_menuIndex</code> của WashingManager cũng không bị đụng tới: <code>msg</code> chỉ
+là một bản sao.)</p>
+<p>Câu hỏi thứ hai còn sắc hơn: <code>msg</code> nằm trên <strong>stack</strong>, trong khung của
+<code>Manager_PostDisplay()</code>. Hàm return là khung đó bị thu hồi ngay lập tức — không
+phải &quot;sẽ bị ghi đè lần lặp sau&quot;, mà là <strong>không còn tồn tại</strong> — rồi WashingManager
+còn chạy tiếp và dùng lại đúng vùng stack ấy cho các lời gọi khác. OLEDTask
+(priority 1) có thể mãi tới vài chục mili-giây sau mới được chạy.</p>
 <p><strong>Nếu queue lưu con trỏ, đây sẽ là lỗi dangling pointer 100 % lần nào cũng
 dính.</strong> Việc màn hình luôn vẽ đúng chính là bằng chứng cứng rằng queue đã chụp
 ảnh dữ liệu, không giữ tham chiếu.</p>
@@ -2282,16 +2310,18 @@ project</strong>, ghi ở <a href="QA_LOG.md">QA_LOG Session 08</a>.</p>
 thứ đã hết ý nghĩa.</strong> Khi hệ thống đổi chế độ hoạt động, phải tự hỏi: <em>&quot;dữ liệu
 đang nằm chờ trong queue có còn đúng cho chế độ mới không?&quot;</em> Nếu không, phải chủ
 động dọn.</p>
-<h2 id="36-một-lỗi-thật-trong-chính-project-này">3.6 Một lỗi thật trong chính project này<a class="anchor" href="#36-một-lỗi-thật-trong-chính-project-này" aria-label="Liên kết tới mục này">#</a></h2>
-<p>Tầng này có thêm một mục ngoài khuôn, vì nó là ví dụ quá tốt và bạn đã gặp nó
-tận mắt từ Tầng 1.</p>
-<p><strong>Triệu chứng:</strong> đang giặt, bấm PA0 để di chuyển con trỏ menu → dòng trạng thái
-dưới cùng của OLED đổi từ <code>WASHING</code> thành <code>IDLE</code>, dù máy vẫn đang giặt.</p>
-<p><strong>Truy nguyên.</strong> UITask cũng gửi vào <code>xDisplayQueue</code> khi con trỏ di chuyển
-(<a href="../App/UITask/Src/ui_task.c#L62-L68">ui_task.c:62-68</a>). Nhưng <code>DisplayMsg_t</code>
-chứa <strong>cả cụm</strong> — <code>menuIndex</code> <em>và</em> <code>statusText</code>. UITask chỉ biết <code>menuIndex</code>; nó
-không biết máy đang ở trạng thái nào, nên lấy tạm từ một biến đệm:</p>
-<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-type">static</span> <span class="hljs-type">char</span> s_statusCache[<span class="hljs-number">24</span>] = <span class="hljs-string">&quot;IDLE&quot;</span>;   <span class="hljs-comment">/* ui_task.c:46 */</span>
+<h2 id="36-một-lỗi-thật-trong-chính-project-này--và-cách-nó-được-sửa">3.6 Một lỗi thật trong chính project này — và cách nó được sửa<a class="anchor" href="#36-một-lỗi-thật-trong-chính-project-này--và-cách-nó-được-sửa" aria-label="Liên kết tới mục này">#</a></h2>
+<p>Tầng này có thêm một mục ngoài khuôn, vì nó là ví dụ quá tốt về <strong>hai chủ cho một
+dữ liệu</strong>. Lỗi này <strong>đã được sửa</strong>; phần mô tả &quot;bản cũ&quot; dưới đây là để bạn hiểu vì
+sao sửa như vậy (code trước khi sửa nằm trong lịch sử git).</p>
+<h3 id="triệu-chứng-của-bản-cũ">Triệu chứng của bản cũ<a class="anchor" href="#triệu-chứng-của-bản-cũ" aria-label="Liên kết tới mục này">#</a></h3>
+<p>Đang giặt, bấm PA0 để di chuyển con trỏ menu → dòng trạng thái dưới cùng của OLED
+đổi từ <code>WASHING</code> thành <code>IDLE</code>, dù máy vẫn đang giặt.</p>
+<h3 id="truy-nguyên">Truy nguyên<a class="anchor" href="#truy-nguyên" aria-label="Liên kết tới mục này">#</a></h3>
+<p>Bản cũ của UITask cũng gửi vào <code>xDisplayQueue</code> mỗi khi con trỏ di chuyển. Nhưng
+<code>DisplayMsg_t</code> chứa <strong>cả cụm</strong> — <code>menuIndex</code> <em>và</em> <code>statusText</code>. UITask chỉ biết
+<code>menuIndex</code>; nó không biết máy đang ở trạng thái nào, nên lấy tạm từ một biến đệm:</p>
+<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-type">static</span> <span class="hljs-type">char</span> s_statusCache[<span class="hljs-number">24</span>] = <span class="hljs-string">&quot;IDLE&quot;</span>;   <span class="hljs-comment">/* ui_task.c, bản cũ */</span>
 </code></pre>
 
 <p>Grep cả file: <strong><code>s_statusCache</code> không bao giờ được ghi.</strong> Nó nằm nguyên giá trị
@@ -2299,8 +2329,7 @@ khởi tạo <code>&quot;IDLE&quot;</code> suốt vòng đời chương trình. 
 status text from last WashingManager display update&quot;</em> — nhưng không có dòng code
 nào thực hiện việc cache đó, và cũng <strong>không thể có</strong>: <code>xDisplayQueue</code> là kênh
 một chiều <code>WashingManager → OLEDTask</code>, UITask không đọc nó.</p>
-<p><strong>Đây không phải lỗi đánh máy — đây là lỗi thiết kế kênh liên lạc</strong>, và đúng chủ
-đề của tầng này:</p>
+<p><strong>Đây không phải lỗi đánh máy — đây là lỗi thiết kế kênh liên lạc:</strong></p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -2311,22 +2340,24 @@ một chiều <code>WashingManager → OLEDTask</code>, UITask không đọc nó
 <tbody>
 <tr>
 <td>Hệ quả</td>
-<td>Bên nào gửi cũng phải bịa nốt phần mình không biết. UITask bịa <code>statusText</code>; WashingManager bịa <code>menuIndex</code></td>
+<td>Bên nào gửi cũng phải bịa nốt phần mình không biết. UITask bịa <code>statusText</code>; WashingManager giữ một bản sao <code>menuIndex</code> riêng</td>
 </tr>
 <tr>
 <td>Vi phạm nguyên tắc</td>
-<td>Tiêu chí ownership ở Tầng 2: <strong>nội dung màn hình đang có hai chủ</strong></td>
+<td>Tiêu chí ownership ở Tầng 2: <strong>nội dung màn hình có hai chủ</strong></td>
 </tr>
 </tbody>
 </table></div>
-<p>Một chi tiết phụ củng cố chẩn đoán: UITask khai <code>DisplayMsg_t disp;</code> rồi chỉ gán
-<code>menuIndex</code> và <code>statusText</code>, <strong>để nguyên <code>state</code> và <code>selectedMode</code> chưa khởi
-tạo</strong> — và queue trung thành copy đủ 36 byte, kể cả hai trường rác đó. Hiện chưa
-gây triệu chứng vì <code>OLED_Render()</code> không dùng tới chúng, nhưng nó cho thấy chính
-người viết cũng cảm nhận được rằng UITask không có đủ thông tin để dựng một
-<code>DisplayMsg_t</code> hoàn chỉnh.</p>
-<p><strong>Ba hướng sửa</strong> (chưa áp dụng — để bạn tự cân nhắc trước khi đọc tiếp các tầng
-sau):</p>
+<p>Và lỗi lệch này còn lộ ra <strong>từ phía ngược lại</strong>: bản sao <code>menuIndex</code> của
+WashingManager chỉ được cập nhật khi nó nhận một lệnh. Sau khi UITask đã dời con
+trỏ lúc đang giặt, tới lần chuyển trạng thái kế tiếp WashingManager gửi
+<code>menuIndex</code> cũ của nó — <strong>con trỏ trên OLED nhảy ngược về chỗ cũ.</strong> Hai bản sao
+của cùng một dữ liệu thì sớm muộn sẽ bất đồng.</p>
+<p>Một chi tiết phụ: UITask khai <code>DisplayMsg_t disp;</code> rồi chỉ gán <code>menuIndex</code> và
+<code>statusText</code>, <strong>để nguyên <code>state</code> và <code>selectedMode</code> chưa khởi tạo</strong> — queue vẫn
+trung thành copy đủ 27 byte kể cả hai trường rác đó. Chính người viết cũng đã
+cảm nhận được rằng UITask không đủ thông tin để dựng một <code>DisplayMsg_t</code> hoàn chỉnh.</p>
+<h3 id="ba-hướng-sửa-được-cân-nhắc">Ba hướng sửa được cân nhắc<a class="anchor" href="#ba-hướng-sửa-được-cân-nhắc" aria-label="Liên kết tới mục này">#</a></h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -2338,35 +2369,102 @@ sau):</p>
 <tbody>
 <tr>
 <td><strong>1. OLEDTask nhớ trạng thái</strong></td>
-<td>Thêm trường <code>updateMask</code> vào <code>DisplayMsg_t</code>; OLEDTask giữ bản sao khung hình gần nhất và chỉ ghi đè phần được đánh dấu</td>
-<td>Sửa ít nhất; nhưng OLEDTask không còn là <em>pure renderer</em></td>
+<td>Thêm <code>updateMask</code> vào <code>DisplayMsg_t</code>; OLEDTask giữ khung hình gần nhất và chỉ ghi đè phần được đánh dấu</td>
+<td>Sửa ít nhất; nhưng OLEDTask không còn là <em>pure renderer</em>, và bản sao <code>menuIndex</code> thứ hai vẫn còn đó</td>
 </tr>
 <tr>
 <td><strong>2. UITask không gửi thẳng OLED</strong></td>
-<td>UITask gửi lệnh &quot;cursor moved&quot; cho WashingManager; WashingManager — bên duy nhất biết đủ mọi thứ — dựng <code>DisplayMsg_t</code> và gửi đi</td>
-<td>Đúng nguyên tắc một chủ nhất; thêm một chặng, con trỏ phản hồi chậm hơn chút</td>
+<td>UITask báo &quot;con trỏ đã dời&quot; cho WashingManager; WashingManager dựng <code>DisplayMsg_t</code></td>
+<td>Đúng nguyên tắc một chủ — <strong>nhưng xem bên dưới</strong></td>
 </tr>
 <tr>
 <td><strong>3. Tách hai queue</strong></td>
 <td>Một queue cho trạng thái, một cho con trỏ; OLEDTask ghép lại</td>
-<td>Rõ ràng nhất về quyền sở hữu; tốn thêm RAM và một chỗ chờ</td>
+<td>Ranh giới sạch nhất; tốn RAM và thêm một chỗ chờ</td>
 </tr>
 </tbody>
 </table></div>
-<p>Hướng 2 hợp với nguyên tắc thiết kế của project nhất (<em>WashingManager là chủ duy
-nhất của trạng thái</em>). Nhưng ghi nhận trung thực: cả ba đều là lựa chọn hợp lệ,
-và việc chọn hướng nào phụ thuộc điều bạn coi trọng hơn — ít code hay ranh giới
-sở hữu sạch.</p>
+<h3 id="vì-sao-không-làm-đúng-như-hướng-2-ban-đầu">Vì sao không làm đúng như hướng 2 ban đầu<a class="anchor" href="#vì-sao-không-làm-đúng-như-hướng-2-ban-đầu" aria-label="Liên kết tới mục này">#</a></h3>
+<p>Khi viết ra mới thấy hướng 2 <em>như đã mô tả</em> vẫn còn lỗ. WashingManager chỉ đọc
+<code>xCommandQueue</code> ở <code>IDLE / FINISH / ERROR</code> (Tầng 2) — lúc đang giặt nó nằm chờ trên
+event group. Nên lệnh &quot;con trỏ đã dời&quot; gửi lúc đang giặt sẽ <strong>nằm im trong queue
+rồi bị <code>xQueueReset</code> xoá</strong> khi máy về <code>FINISH</code>. UITask vẫn tin con trỏ ở vị trí
+mới, màn hình thì ở vị trí cũ, và bấm Start sẽ chạy chương trình <strong>khác với cái
+đang hiển thị</strong>. Vẫn là hai chủ, chỉ đổi chỗ lệch.</p>
+<p>Lời giải đúng không phải là <em>báo</em> cho nhau, mà là <strong>chỉ còn một bản</strong>: chuyển hẳn
+quyền sở hữu con trỏ sang WashingManager.</p>
+<h3 id="cách-sửa-thật-sự">Cách sửa thật sự<a class="anchor" href="#cách-sửa-thật-sự" aria-label="Liên kết tới mục này">#</a></h3>
+<p>UITask thành <strong>bộ dịch không trạng thái</strong> — chỉ đổi tên cử chỉ thành lệnh, không
+biết con trỏ ở đâu hay máy đang làm gì (<a href="../App/UITask/Src/ui_task.c#L49-L68">ui_task.c:49-68</a>):</p>
+<pre class="code" data-lang="c"><code class="hljs">BTN_EVENT_NAVIGATE  →  CMD_NAVIGATE
+BTN_EVENT_CONFIRM   →  CMD_CONFIRM
+</code></pre>
+
+<p>WashingManager giữ con trỏ và là <strong>bên duy nhất</strong> dựng <code>DisplayMsg_t</code>
+(<a href="../App/WashingManager/Src/washing_manager.c#L200-L228">washing_manager.c:200-228</a>):</p>
+<pre class="code" data-lang="c"><code class="hljs"><span class="hljs-keyword">case</span> CMD_NAVIGATE:
+    s_menuIndex = (<span class="hljs-type">uint8_t</span>)((s_menuIndex + <span class="hljs-number">1u</span>) % MENU_ITEM_COUNT);
+    Manager_PostDisplay(state);      <span class="hljs-comment">/* chữ trạng thái dựng từ trạng thái THẬT */</span>
+    <span class="hljs-keyword">break</span>;
+
+<span class="hljs-keyword">case</span> CMD_CONFIRM:
+    <span class="hljs-keyword">if</span> (state == WASH_STATE_FINISH || state == WASH_STATE_ERROR)
+        WashingSM_ProcessEvent(WASH_EVT_RESET);        <span class="hljs-comment">/* xác nhận, về IDLE   */</span>
+    <span class="hljs-keyword">else</span> <span class="hljs-keyword">if</span> (s_menuIndex == <span class="hljs-number">0u</span>)
+        { s_currentMode = WASH_MODE_WASH; WashingSM_ProcessEvent(WASH_EVT_START_WASH); }
+    <span class="hljs-keyword">else</span>
+        { s_currentMode = WASH_MODE_SPIN; WashingSM_ProcessEvent(WASH_EVT_START_SPIN); }
+    <span class="hljs-keyword">break</span>;
+</code></pre>
+
+<p>Ba hệ quả đáng thấy:</p>
+<ol>
+<li><strong><code>CommandMsg_t</code> co từ 3 byte xuống còn 1 byte</strong> (số đo thật; comment cũ ghi 8, rồi 12 — đều sai). Nó không cần
+mang <code>menuIndex</code> và <code>mode</code> nữa — hai thông tin đó giờ nằm trong người nhận.</li>
+<li><strong>Chữ trạng thái không còn là chuỗi truyền tay.</strong> <code>Manager_StatusText()</code> là một
+bảng duy nhất, tra theo trạng thái — nên chữ trên màn hình không thể lệch với
+trạng thái, như một chuỗi truyền tay (hay một biến đệm không ai ghi) từng lệch.</li>
+<li><strong>Một cái giá, nói thẳng:</strong> lúc máy đang chạy chu trình, nút bấm bị bỏ qua và
+con trỏ đứng im (bạn đã thử ở Tầng 1, &quot;Thử thêm&quot; của Thí nghiệm A). Đây là hệ
+quả trực tiếp của việc WashingManager chỉ chờ <strong>một</strong> nguồn tại một thời điểm.
+Nó hợp lý — giữa chu trình không có gì để chọn — và nó cũng chính là lý do
+không thể &quot;gộp UITask vào WashingManager&quot; mà không cân nhắc cơ chế chờ.</li>
+</ol>
+<h3 id="kiểm-chứng">Kiểm chứng<a class="anchor" href="#kiểm-chứng" aria-label="Liên kết tới mục này">#</a></h3>
+<ul>
+<li><code>make clean &amp;&amp; make all</code>: <strong>0 warning</strong>. Vùng <code>data</code> giảm đúng <strong>24 byte</strong>
+(44 → 20) — bằng đúng mảng <code>s_statusCache[24]</code>: bằng chứng cứng rằng biến đó từng
+chiếm RAM thật mà chưa từng được ghi.</li>
+<li><strong>Chưa thử trên board.</strong> Thay vào đó, logic thật được chạy trên PC: biên dịch
+nguyên <code>washing_manager.c</code> và <code>washing_sm.c</code> của project, chỉ giả lập FreeRTOS và
+BSP. <strong>37 kiểm tra đạt</strong>, gồm cả kịch bản lỗi gốc (con trỏ dời lúc đang giặt phải
+hiện <code>WASHING</code>, không phải <code>IDLE</code>) và kịch bản con trỏ nhảy ngược.</li>
+<li><strong>Kiểm tra đột biến:</strong> cố tình đưa lỗi cũ trở lại (gửi cứng chữ <code>IDLE</code>; cho
+<code>CMD_NAVIGATE</code> reset trạng thái cuối; không tăng con trỏ) → bài test báo hỏng cả
+ba lần. Một bài test chưa từng được thấy <em>thất bại</em> thì chưa chứng minh được gì.</li>
+</ul>
+<h3 id="bài-học">Bài học<a class="anchor" href="#bài-học" aria-label="Liên kết tới mục này">#</a></h3>
+<ol>
+<li><strong>Hai bản sao của một dữ liệu thì sớm muộn sẽ lệch.</strong> Cách sửa đúng là <em>bỏ một
+bản</em>, không phải <em>đồng bộ hai bản</em>.</li>
+<li><strong>Một thông điệp nên do đúng một bên biết đủ dựng ra.</strong> Hai bên cùng gửi, mỗi
+bên một nửa, là công thức của dữ liệu rác.</li>
+<li><strong>Chạy thử một đề xuất thiết kế qua mọi trạng thái trước khi tin nó.</strong> Hướng 2
+nghe hợp lý và chỉ hỏng ở đúng một trạng thái: lúc đang giặt.</li>
+<li><strong>Sau khi sửa, UITask chỉ còn ~25 dòng và đổi tên 1-1.</strong> Câu hỏi &quot;có cần task
+này nữa không&quot; xuất hiện rất tự nhiên — nhưng đó là một quyết định khác, chưa
+được đưa ra.</li>
+</ol>
 <h2 id="37-tự-kiểm-tra">3.7 Tự kiểm tra<a class="anchor" href="#37-tự-kiểm-tra" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Tự trả lời trước, rồi đọc phần giải thích ngay bên dưới.</p>
 <hr>
-<p><strong>Câu 1. <code>xDisplayQueue</code> sâu 5 và mỗi phần tử 36 byte. Nếu đổi
+<p><strong>Câu 1. <code>xDisplayQueue</code> sâu 5 và mỗi phần tử 27 byte. Nếu đổi
 <code>DisplayMsg_t.statusText</code> từ <code>char[24]</code> thành <code>char *</code>, RAM tiết kiệm được bao
 nhiêu, và cái giá phải trả là gì?</strong></p>
-<p><strong>Trả lời:</strong> tiết kiệm khoảng <code>5 × 20 = 100 byte</code>, và cái giá là <strong>đánh đổi một
-bug tiềm ẩn nghiêm trọng lấy 100 byte trên tổng 128 KB SRAM</strong> — hoàn toàn không
+<p><strong>Trả lời:</strong> tiết kiệm khoảng <code>5 × 19 = 95 byte</code>, và cái giá là <strong>đánh đổi một
+bug tiềm ẩn nghiêm trọng lấy 95 byte trên tổng 128 KB SRAM</strong> — hoàn toàn không
 đáng.</p>
-<p><code>char *</code> chỉ 4 byte, nên phần tử co từ 36 xuống 16 byte. Nhưng khi đó queue chở
+<p><code>char *</code> chỉ 4 byte, nên phần tử co từ 27 xuống 8 byte (3 trường nhỏ + 1 byte đệm căn lề + 4 byte con trỏ). Nhưng khi đó queue chở
 <strong>địa chỉ</strong>, và câu hỏi lập tức phát sinh: chuỗi mà địa chỉ đó trỏ tới nằm ở đâu?</p>
 <div class="table-wrap"><table>
 <thead>
@@ -2397,7 +2495,7 @@ liệu đủ lớn để phép copy trở thành vấn đề đo được</stron
 mức đó, copy theo giá trị luôn thắng vì nó xoá sạch cả một lớp bug về vòng đời
 bộ nhớ.</p>
 <hr>
-<p><strong>Câu 2. Cả ba chỗ gửi trong project đều dùng timeout <code>0</code>, tức là chấp nhận mất
+<p><strong>Câu 2. Cả hai chỗ gửi từ task trong project đều dùng timeout <code>0</code>, tức là chấp nhận mất
 dữ liệu khi queue đầy. Với <code>xCommandQueue</code> — queue chở lệnh của người dùng —
 việc mất lệnh có chấp nhận được không?</strong></p>
 <p><strong>Trả lời:</strong> được, nhưng vì một lý do khác với <code>xDisplayQueue</code>, và đáng phân biệt
@@ -2435,7 +2533,7 @@ thượng nguồn của nó</strong> — đây là cách suy luận cần tập 
 hệ thống nhiều task.</p>
 <p>Cách làm chuẩn hơn cho lệnh người dùng: kiểm tra giá trị trả về của
 <code>xQueueSend()</code> và báo cho người dùng biết khi thất bại (nháy đèn, kêu bíp). Hiện
-project bỏ qua giá trị trả về ở cả ba chỗ gửi — chấp nhận được với quy mô này,
+project bỏ qua giá trị trả về ở cả hai chỗ gửi từ task — chấp nhận được với quy mô này,
 nhưng trong sản phẩm thật thì phải xử lý.</p>
 <hr>
 <p><strong>Câu 3. UITask nằm <code>Blocked</code> trên <code>xQueueReceive(xButtonQueue, ..., portMAX_DELAY)</code>.
@@ -2474,9 +2572,9 @@ nói: RTOS đảm bảo thứ tự ưu tiên, không đảm bảo thời điểm
 nội dung <strong>Tầng 6</strong>.</p>
 <h2 id="38-đào-sâu">3.8 Đào sâu<a class="anchor" href="#38-đào-sâu" aria-label="Liên kết tới mục này">#</a></h2>
 <ul>
-<li>Bảng API Queue đầy đủ, cột &quot;gọi được từ ISR?&quot; → <a href="LEARNING_NOTES.md">LEARNING_NOTES §C.1</a></li>
+<li>Bảng API Queue đầy đủ, cột &quot;gọi được từ ISR?&quot; → <a href="LEARNING_NOTES.html">LEARNING_NOTES §C.1</a></li>
 <li>Vì sao chọn Queue cho kênh này, Event Group cho kênh kia → <a href="../PROJECT_PROGRESS.md">PROJECT_PROGRESS.md</a> mục TD-02</li>
-<li>Cấu trúc bên trong của Queue, chi phí RAM thực tế → <a href="LEARNING_NOTES.md">LEARNING_NOTES §1.1</a> (Event Group, cùng nguyên lý danh sách task chờ)</li>
+<li>Cấu trúc bên trong của Queue, chi phí RAM thực tế → <a href="LEARNING_NOTES.html">LEARNING_NOTES §1.1</a> (Event Group, cùng nguyên lý danh sách task chờ)</li>
 <li>Bug #10 — lệnh tồn đọng trong queue → <a href="QA_LOG.md">QA_LOG Session 08</a></li>
 </ul>
 <hr>
@@ -2597,6 +2695,13 @@ ghi chú &quot;Để sau&quot; ở §0.3.</p>
     function fitWidth() {
       var vw = view.clientWidth;
       var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      if (!isFull()) {
+        // A diagram only a little taller than the frame is easier to read whole than
+        // scrolled: shrink it (by at most 30 %) so it fits. Much taller ones keep
+        // fit-to-width and are panned instead.
+        var kWhole = (window.innerHeight * 0.82 - 24) / S.h;
+        if (S.h * k + 24 > window.innerHeight * 0.82 && kWhole >= k * 0.7) k = kWhole;
+      }
       S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
       setViewHeight(S.h * S.k + 24);
       var vh = view.clientHeight;

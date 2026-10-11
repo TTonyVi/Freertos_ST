@@ -2107,22 +2107,28 @@ lượt thì chạy. Nhấn nút lúc nào cũng vậy, không có ngoại lệ.
 
 **Vậy "vô tác dụng" được cài đặt ở đâu?** Ba mảnh ghép trong code thật:
 
-**(1)** UITask **vẫn chạy đủ**, vẫn gửi lệnh (`ui_task.c:69-81`):
+**(1)** UITask **vẫn chạy đủ**, vẫn gửi lệnh (`ui_task.c:49-68`):
 
 ```c
-} else if (event == BTN_EVENT_CONFIRM) {
-    cmd.command = CMD_START_WASH;
-    xQueueSend(xCommandQueue, &cmd, 0);     /* ← vẫn gửi bình thường! */
-}
+case BTN_EVENT_CONFIRM:
+    cmd.command = CMD_CONFIRM;
+    break;
+...
+xQueueSend(xCommandQueue, &cmd, 0);     /* ← vẫn gửi bình thường! */
 ```
 
 **(2)** WashingManager ở state WASHING **không hề đọc `xCommandQueue`**
-(`washing_manager.c:291-297`) — nó chỉ đọc ở IDLE / FINISH / ERROR
-(`:249-254`). Lệnh **nằm im trong queue**, không ai lấy.
+(`washing_manager.c:324`) — nó chỉ đọc ở IDLE / FINISH / ERROR
+(`:282-288`). Lệnh **nằm im trong queue**, không ai lấy.
+
+> *Cập nhật 2026-10-10:* đoạn mã ở (1) là bản **sau** khi UITask được đơn giản hoá
+> thành bộ dịch không trạng thái (`CMD_NAVIGATE` / `CMD_CONFIRM`); trước đó nó gửi
+> `CMD_START_WASH` / `CMD_START_SPIN` theo con trỏ menu mà UITask từng giữ. Lập
+> luận của mục này không đổi — chỉ tên lệnh và vị trí con trỏ.
 
 **(3)** Vì nằm im nên nó sẽ "nổ chậm" khi máy về IDLE (bấm nút lúc đang giặt →
 giặt xong tự khởi động chu trình mới!). Code chặn đúng chỗ đó
-(`washing_manager.c:66-67`, và tương tự trong `Manager_OnEnterFinish()` /
+(`washing_manager.c:71`, và tương tự trong `Manager_OnEnterFinish()` /
 `Manager_OnEnterError()`):
 
 ```c
@@ -2137,11 +2143,17 @@ giặt xong tự khởi động chu trình mới!). Code chặn đúng chỗ đ�
 > cho UITask tự hỏi "máy đang giặt à?" — thì logic trạng thái bị rải ra 2 nơi,
 > và sẽ có lúc hai nơi bất đồng.
 
-**Hệ quả kiểm chứng được trên board:** nhấn nút NAVIGATE (PA0) lúc đang giặt
-thì **con trỏ menu trên OLED vẫn di chuyển**, vì UITask gửi thẳng
-`xDisplayQueue` không qua WashingManager (`ui_task.c:60-67`). Đó là hệ quả trực
-tiếp của kiến trúc trên — feature hay bug là quyết định thiết kế, không phải
-tai nạn.
+**Hệ quả quan sát được trên board (đã đổi 2026-10-10):** nhấn nút NAVIGATE (PA0)
+lúc đang giặt thì **con trỏ menu đứng im** — WashingManager không đọc
+`xCommandQueue` trong lúc chạy chu trình, nên lệnh `CMD_NAVIGATE` nằm chờ rồi bị
+`xQueueReset` xoá.
+
+*Lịch sử:* trước đây UITask giữ con trỏ và gửi thẳng `xDisplayQueue` không qua
+WashingManager, nên con trỏ **vẫn di chuyển** lúc đang giặt — kèm một lỗi: dòng
+trạng thái bị đổi thành `IDLE`, và con trỏ nhảy ngược ở lần chuyển trạng thái kế
+tiếp. Câu "feature hay bug là quyết định thiết kế, không phải tai nạn" ở bản cũ của
+mục này hoá ra đúng theo nghĩa khác: đó là **bug**, do con trỏ có hai chủ. Phân
+tích đầy đủ và cách sửa ở START_HERE Tầng 3 §3.6.
 
 ### §5.10 Lỗi thường gặp liên quan tick
 

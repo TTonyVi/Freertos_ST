@@ -23,13 +23,17 @@
  * -------------------------------------------------------------------------- */
 
 static WashMode_t s_currentMode  = WASH_MODE_WASH;
+
+/* The menu cursor (0 = Wash, 1 = Spin). This is the ONLY copy: UITask holds
+ * none, so what the OLED shows and what Start will run can never disagree. */
 static uint8_t    s_menuIndex    = 0u;
 
 /* --------------------------------------------------------------------------
  * Private function declarations
  * -------------------------------------------------------------------------- */
 
-static void Manager_PostDisplay(WashState_t state, const char *statusText);
+static const char *Manager_StatusText(WashState_t state);
+static void Manager_PostDisplay(WashState_t state);
 static void Manager_HandleCommand(const CommandMsg_t *cmd);
 
 /* SM entry-action callbacks — one per state */
@@ -66,7 +70,7 @@ static void Manager_OnEnterIdle(void)
     /* Clear any stale commands that queued up while the machine was running. */
     (void)xQueueReset(xCommandQueue);
 
-    Manager_PostDisplay(WASH_STATE_IDLE, "IDLE");
+    Manager_PostDisplay(WASH_STATE_IDLE);
 }
 
 static void Manager_OnEnterFillWater(void)
@@ -74,7 +78,7 @@ static void Manager_OnEnterFillWater(void)
     BSP_Valve_Open(BSP_VALVE_INLET);
     BSP_LED_On();
     xTimerStart(xFillTimeoutTimer, 0);
-    Manager_PostDisplay(WASH_STATE_FILL_WATER, "FILL WATER");
+    Manager_PostDisplay(WASH_STATE_FILL_WATER);
 }
 
 static void Manager_OnEnterWashing(void)
@@ -82,7 +86,7 @@ static void Manager_OnEnterWashing(void)
     BSP_Valve_Close(BSP_VALVE_INLET);   /* stop filling before motor starts */
     BSP_Motor_Start();
     xTimerStart(xWashTimer, 0);
-    Manager_PostDisplay(WASH_STATE_WASHING, "WASHING");
+    Manager_PostDisplay(WASH_STATE_WASHING);
 }
 
 static void Manager_OnEnterDrain(void)
@@ -90,7 +94,7 @@ static void Manager_OnEnterDrain(void)
     BSP_Motor_Stop();
     BSP_Valve_Open(BSP_VALVE_DRAIN);
     xTimerStart(xDrainTimer, 0);
-    Manager_PostDisplay(WASH_STATE_DRAIN, "DRAIN");
+    Manager_PostDisplay(WASH_STATE_DRAIN);
 }
 
 static void Manager_OnEnterSpin(void)
@@ -98,7 +102,7 @@ static void Manager_OnEnterSpin(void)
     BSP_Valve_Close(BSP_VALVE_DRAIN);
     BSP_Motor_Start();
     xTimerStart(xSpinTimer, 0);
-    Manager_PostDisplay(WASH_STATE_SPIN, "SPINNING");
+    Manager_PostDisplay(WASH_STATE_SPIN);
 }
 
 static void Manager_OnEnterFinish(void)
@@ -112,7 +116,7 @@ static void Manager_OnEnterFinish(void)
     /* Clear any stale commands that queued up while the machine was running. */
     (void)xQueueReset(xCommandQueue);
 
-    Manager_PostDisplay(WASH_STATE_FINISH, "FINISHED");
+    Manager_PostDisplay(WASH_STATE_FINISH);
 }
 
 static void Manager_OnEnterError(void)
@@ -127,7 +131,7 @@ static void Manager_OnEnterError(void)
     /* Clear any stale commands that queued up while the machine was running. */
     (void)xQueueReset(xCommandQueue);
 
-    Manager_PostDisplay(WASH_STATE_ERROR, "ERROR");
+    Manager_PostDisplay(WASH_STATE_ERROR);
 }
 
 /* --------------------------------------------------------------------------
@@ -135,63 +139,92 @@ static void Manager_OnEnterError(void)
  * -------------------------------------------------------------------------- */
 
 /*
- * Build a DisplayMsg_t from the current state and send it to OLEDTask.
+ * Status line shown on the OLED for each state. One table, one place: every
+ * display message is built from the state, so the text can never disagree
+ * with the state the way a hand-passed (or cached) string could.
+ */
+static const char *Manager_StatusText(WashState_t state)
+{
+    static const char *const kText[] = {
+        [WASH_STATE_IDLE]       = "IDLE",
+        [WASH_STATE_FILL_WATER] = "FILL WATER",
+        [WASH_STATE_WASHING]    = "WASHING",
+        [WASH_STATE_DRAIN]      = "DRAIN",
+        [WASH_STATE_SPIN]       = "SPINNING",
+        [WASH_STATE_FINISH]     = "FINISHED",
+        [WASH_STATE_ERROR]      = "ERROR",
+    };
+
+    if ((unsigned)state < (sizeof(kText) / sizeof(kText[0])) && kText[state] != NULL)
+    {
+        return kText[state];
+    }
+    return "?";
+}
+
+/*
+ * Build a complete DisplayMsg_t — state, status text, mode AND cursor — and
+ * send it to OLEDTask. WashingManager is the only producer of this message,
+ * which is what guarantees every field is consistent.
+ *
  * Uses timeout 0 — if the display queue is full, the update is silently
  * dropped rather than blocking WashingManager.  OLEDTask will render the
  * next queued message instead.
  */
-static void Manager_PostDisplay(WashState_t state, const char *statusText)
+static void Manager_PostDisplay(WashState_t state)
 {
     DisplayMsg_t msg;
     msg.state        = state;
     msg.selectedMode = s_currentMode;
     msg.menuIndex    = s_menuIndex;
 
-    (void)strncpy(msg.statusText, statusText, sizeof(msg.statusText) - 1u);
+    (void)strncpy(msg.statusText, Manager_StatusText(state), sizeof(msg.statusText) - 1u);
     msg.statusText[sizeof(msg.statusText) - 1u] = '\0';
 
     xQueueSend(xDisplayQueue, &msg, 0);
 }
 
 /*
- * Translate a CommandMsg_t received from xCommandQueue into a WashEvent_t
- * and forward it to the state machine.
+ * Interpret a CommandMsg_t from xCommandQueue.
  *
- * Also records the selected mode so that display messages carry the correct
- * mode while the cycle is running.
+ * Only reached from IDLE / FINISH / ERROR — the other states block on the
+ * event group and never read this queue (see the task loop).
+ *
+ *   CMD_NAVIGATE  advance the cursor and refresh the screen. The status line
+ *                 is rebuilt from the CURRENT state, not guessed.
+ *   CMD_CONFIRM   FINISH / ERROR → acknowledge, back to IDLE (Bug #10 fix:
+ *                 whatever the user presses in a terminal state means
+ *                 "I have seen it").
+ *                 IDLE → start the program under the cursor.
  */
 static void Manager_HandleCommand(const CommandMsg_t *cmd)
 {
-    s_menuIndex = cmd->menuIndex;
-
-    WashState_t currentState = WashingSM_GetState();
-    if (currentState == WASH_STATE_FINISH || currentState == WASH_STATE_ERROR)
-    {
-        /* In terminal states, interpret any command/gesture (like pressing Start)
-         * as a reset event to return to IDLE state. This resolves Bug #10. */
-        WashingSM_ProcessEvent(WASH_EVT_RESET);
-        return;
-    }
+    const WashState_t state = WashingSM_GetState();
 
     switch (cmd->command)
     {
-        case CMD_START_WASH:
-            s_currentMode = WASH_MODE_WASH;
-            WashingSM_ProcessEvent(WASH_EVT_START_WASH);
+        case CMD_NAVIGATE:
+            s_menuIndex = (uint8_t)((s_menuIndex + 1u) % MENU_ITEM_COUNT);
+            Manager_PostDisplay(state);
             break;
 
-        case CMD_START_SPIN:
-            s_currentMode = WASH_MODE_SPIN;
-            WashingSM_ProcessEvent(WASH_EVT_START_SPIN);
+        case CMD_CONFIRM:
+            if (state == WASH_STATE_FINISH || state == WASH_STATE_ERROR)
+            {
+                WashingSM_ProcessEvent(WASH_EVT_RESET);
+            }
+            else if (s_menuIndex == 0u)
+            {
+                s_currentMode = WASH_MODE_WASH;
+                WashingSM_ProcessEvent(WASH_EVT_START_WASH);
+            }
+            else
+            {
+                s_currentMode = WASH_MODE_SPIN;
+                WashingSM_ProcessEvent(WASH_EVT_START_SPIN);
+            }
             break;
 
-        /* CMD_RESET has no case here on purpose: no producer ever builds
-         * cmd->command = CMD_RESET (UITask only sends CMD_START_WASH /
-         * CMD_START_SPIN), and the FINISH/ERROR check above already
-         * intercepts every command in those states before this switch is
-         * reached (Bug #10 fix). A CMD_RESET case here would be dead code.
-         * The enum value stays in app_types.h for a future producer to use;
-         * if one is ever added, re-add the case then. */
         default:
             break;
     }
@@ -224,7 +257,7 @@ void WashingManager_Task(void *pvParameters)
     BSP_Valve_Init();
     BSP_LED_Init();
 
-    Manager_PostDisplay(WASH_STATE_IDLE, "IDLE");
+    Manager_PostDisplay(WASH_STATE_IDLE);
 
     /* ------------------------------------------------------------------
      * State-dependent blocking loop

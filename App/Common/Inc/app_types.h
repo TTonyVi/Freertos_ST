@@ -25,9 +25,9 @@
  *   WASHING     → DRAIN       (EVT_TIMEOUT — wash complete)
  *   DRAIN       → SPIN        (EVT_TIMEOUT — drain complete)
  *   SPIN        → FINISH      (EVT_TIMEOUT — spin complete)
- *   FINISH      → IDLE        (user acknowledge)
+ *   FINISH      → IDLE        (user acknowledge — CMD_CONFIRM)
  *   Any         → ERROR       (door opened while running)
- *   ERROR       → IDLE        (CMD_RESET)
+ *   ERROR       → IDLE        (user acknowledge — CMD_CONFIRM)
  * -------------------------------------------------------------------------- */
 typedef enum
 {
@@ -77,22 +77,29 @@ typedef enum
  * Command_t
  *
  * High-level intent sent from UITask to WashingManager via Command Queue.
- * UITask maps (ButtonEvent_t + menu state) → Command_t.
  *
- *   BTN_EVENT_NAVIGATE (PA0)          →  UITask moves cursor (no command sent)
- *   BTN_EVENT_CONFIRM (PD2), cursor=Wash →  CMD_START_WASH
- *   BTN_EVENT_CONFIRM (PD2), cursor=Spin →  CMD_START_SPIN
+ * UITask is a pure translator — it renames a gesture into an intent and
+ * holds no state. It does NOT know where the menu cursor is or which state
+ * the machine is in; WashingManager owns both and interprets the intent:
  *
- * CMD_RESET is never built by UITask — WashingManager reinterprets any
- * incoming CMD_START_WASH/CMD_START_SPIN as a reset while in FINISH or
- * ERROR state instead (see Manager_HandleCommand() in washing_manager.c).
- * The enum value is kept for a future producer that might send it directly.
+ *   BTN_EVENT_NAVIGATE (PA0)  →  CMD_NAVIGATE
+ *   BTN_EVENT_CONFIRM  (PD2)  →  CMD_CONFIRM
+ *
+ * How WashingManager reads them (see Manager_HandleCommand()):
+ *
+ *   CMD_NAVIGATE  any state that reads the queue (IDLE/FINISH/ERROR)
+ *                 → cursor advances, display refreshed
+ *   CMD_CONFIRM   IDLE          → start the program under the cursor
+ *                 FINISH/ERROR  → acknowledge, return to IDLE
+ *
+ * While a cycle is running WashingManager does not read this queue, so both
+ * commands are ignored; whatever piled up is discarded on the next return
+ * to IDLE/FINISH/ERROR (xQueueReset).
  * -------------------------------------------------------------------------- */
 typedef enum
 {
-    CMD_START_WASH = 0, /**< Start the full wash cycle. */
-    CMD_START_SPIN,     /**< Start the spin-only cycle. */
-    CMD_RESET,          /**< Reserved: no current producer sends this (see above). */
+    CMD_NAVIGATE = 0, /**< Move the menu cursor to the next item. */
+    CMD_CONFIRM,      /**< Start the selected program, or acknowledge FINISH/ERROR. */
 } Command_t;
 
 #endif /* APP_COMMON_APP_TYPES_H */

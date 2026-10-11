@@ -334,11 +334,12 @@ Bốn task chia sẻ với nhau qua ba queue và một event group. Mọi luồn
 **một chiều** và mỗi đối tượng chỉ có **một bên gửi, một bên nhận chính**.
 
 ```mermaid
+%%{init: {"flowchart": {"rankSpacing": 34, "nodeSpacing": 36, "subGraphTitleMargin": {"top": 4, "bottom": 22}}}}%%
 flowchart TB
     subgraph CMD["① Luồng lệnh người dùng"]
         ISR(["<b>Button ISR</b><br/>PA0 · PD2"])
         BQ[("<b>Button Queue</b>")]
-        UI["<b>UI Task</b> · Prio 2<br/>menu · tạo lệnh"]
+        UI["<b>UI Task</b> · Prio 2<br/>đổi tên nút bấm thành lệnh"]
         CQ[("<b>Command Queue</b>")]
         ISR --> BQ --> UI --> CQ
     end
@@ -351,9 +352,10 @@ flowchart TB
         TMR --> EG
     end
 
-    WM["<b>WashingManager Task</b> · Prio 3<br/>chủ duy nhất của máy trạng thái<br/>điều khiển motor · van · đèn"]
+    WM["<b>WashingManager Task</b> · Prio 3<br/>chủ duy nhất của máy trạng thái<br/>và của con trỏ menu<br/>điều khiển motor · van · đèn"]
 
     subgraph DSP["③ Luồng hiển thị"]
+        direction LR
         DQ[("<b>Display Queue</b>")]
         OLED["<b>OLED Task</b> · Prio 1<br/>chủ duy nhất của OLED"]
         DQ --> OLED
@@ -361,7 +363,7 @@ flowchart TB
 
     CQ --> WM
     EG --> WM
-    WM --> DQ
+    WM --> DSP
 
     classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
     classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
@@ -392,7 +394,8 @@ flowchart TB
 **Cách đọc:**
 
 1. **Luồng lệnh** — nút bấm tạo ngắt; ISR đẩy sự kiện vào Button Queue; UI Task
-   diễn giải theo vị trí con trỏ menu rồi gửi lệnh Start qua Command Queue.
+   đổi tên cử chỉ thành lệnh (`CMD_NAVIGATE` / `CMD_CONFIRM`) rồi gửi qua Command
+   Queue. WashingManager mới là bên giữ con trỏ menu và diễn giải lệnh.
 2. **Luồng sự kiện** — Sensor Task (định kỳ) và các Software Timer (khi hết giờ)
    set bit vào Event Group; WashingManager chờ đúng những bit có nghĩa ở trạng
    thái hiện tại.
@@ -411,13 +414,17 @@ flowchart TB
 Responsibilities:
 
 * Process button events
-* Menu navigation
-* Mode selection
-* Generate commands
+* Translate each gesture into a command (CMD_NAVIGATE / CMD_CONFIRM)
 
 Priority:
 
 2
+
+Notes:
+
+UITask holds no state — it does not know the menu cursor or the machine state.
+Both belong to WashingManager (single owner), so the screen and the command
+interpretation can never disagree.
 
 ---
 
@@ -426,6 +433,7 @@ Priority:
 Responsibilities:
 
 * State machine execution
+* Menu cursor ownership and the single source of every display update
 * System coordination
 * Motor control
 * Valve control
@@ -577,7 +585,8 @@ Future Usage:
 
 Fill Water:
 
-10 seconds
+Up to 10 seconds — a safety timeout only. The inlet valve stays open until the
+water level sensor reports full; if it never does, the machine enters ERROR
 
 Wash:
 

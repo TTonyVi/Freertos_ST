@@ -101,6 +101,13 @@
     function fitWidth() {
       var vw = view.clientWidth;
       var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      if (!isFull()) {
+        // A diagram only a little taller than the frame is easier to read whole than
+        // scrolled: shrink it (by at most 30 %) so it fits. Much taller ones keep
+        // fit-to-width and are panned instead.
+        var kWhole = (window.innerHeight * 0.82 - 24) / S.h;
+        if (S.h * k + 24 > window.innerHeight * 0.82 && kWhole >= k * 0.7) k = kWhole;
+      }
       S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
       setViewHeight(S.h * S.k + 24);
       var vh = view.clientHeight;

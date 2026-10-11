@@ -5,6 +5,9 @@
  * Responsibilities:
  *   - Owns the washing machine state machine (washing_sm).
  *   - Receives CommandMsg_t from xCommandQueue (producer: UITask).
+ *   - Owns the menu cursor. UITask only forwards CMD_NAVIGATE / CMD_CONFIRM;
+ *     the cursor, the selected program and the status text all live here,
+ *     so DisplayMsg_t is always built complete and consistent.
  *   - Waits on xSystemEvents for EVT_WATER_FULL and EVT_TIMEOUT (set by SensorTask
  *     and software timer callbacks respectively).
  *   - Translates inbound signals into WashEvent_t and drives WashingSM_ProcessEvent().
@@ -29,8 +32,11 @@
  *
  * Blocking strategy per state:
  *   IDLE / FINISH / ERROR  →  xQueueReceive(xCommandQueue, portMAX_DELAY)
- *   FILL_WATER             →  xEventGroupWaitBits(EVT_WATER_FULL | EVT_TIMEOUT)
- *   WASHING / DRAIN / SPIN →  vTaskDelay (Phase 7: replaced by timer event wait)
+ *   FILL_WATER             →  xEventGroupWaitBits(EVT_WATER_FULL | EVT_TIMEOUT | EVT_ERROR)
+ *   WASHING / DRAIN / SPIN →  xEventGroupWaitBits(EVT_TIMEOUT | EVT_ERROR)
+ *
+ * Consequence: while a cycle runs, xCommandQueue is not read, so button
+ * commands are ignored (and discarded on return to IDLE/FINISH/ERROR).
  *
  * @param  pvParameters  Unused. Pass NULL to xTaskCreate().
  */

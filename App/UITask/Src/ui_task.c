@@ -1,6 +1,11 @@
 /**
  * @file    ui_task.c
- * @brief   UITask implementation — button input handler and menu navigator.
+ * @brief   UITask implementation — translates button gestures into commands.
+ *
+ * UITask holds no state. It does not know where the menu cursor is or what
+ * the machine is doing; WashingManager owns both. That is deliberate: when
+ * UITask kept its own copy of the cursor and also drew to the OLED, the two
+ * copies drifted apart and the status line showed stale text.
  */
 
 #include "ui_task.h"
@@ -12,14 +17,6 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
-
-#include <string.h>
-
-/* --------------------------------------------------------------------------
- * Menu configuration
- * -------------------------------------------------------------------------- */
-
-#define MENU_ITEM_COUNT 2u /* 0 = Wash, 1 = Spin */
 
 /* --------------------------------------------------------------------------
  * ISR callback — runs in EXTI interrupt context
@@ -41,44 +38,33 @@ static void Button_EventCallback(ButtonEvent_t event) {
  * UITask
  * -------------------------------------------------------------------------- */
 
-/* Cached status text from last WashingManager display update.
- * UITask piggybacks this when it sends its own cursor-update messages. */
-static char s_statusCache[24] = "IDLE";
-
 void UITask(void *pvParameters) {
   (void)pvParameters;
 
   BSP_Button_RegisterCallback(Button_EventCallback);
 
-  uint8_t menuIndex = 0u;
   ButtonEvent_t event;
 
   while (1) {
     xQueueReceive(xButtonQueue, &event, portMAX_DELAY);
 
-    if (event == BTN_EVENT_NAVIGATE) {
-      menuIndex = (uint8_t)((menuIndex + 1u) % MENU_ITEM_COUNT);
+    CommandMsg_t cmd;
 
-      /* Send display update so user sees cursor move immediately. */
-      DisplayMsg_t disp;
-      disp.menuIndex = menuIndex;
-      (void)strncpy(disp.statusText, s_statusCache,
-                    sizeof(disp.statusText) - 1u);
-      disp.statusText[sizeof(disp.statusText) - 1u] = '\0';
-      xQueueSend(xDisplayQueue, &disp, 0);
-    } else if (event == BTN_EVENT_CONFIRM) {
-      CommandMsg_t cmd;
-      cmd.menuIndex = menuIndex;
+    switch (event) {
+    case BTN_EVENT_NAVIGATE:
+      cmd.command = CMD_NAVIGATE;
+      break;
 
-      if (menuIndex == 0u) {
-        cmd.command = CMD_START_WASH;
-        cmd.mode = WASH_MODE_WASH;
-      } else {
-        cmd.command = CMD_START_SPIN;
-        cmd.mode = WASH_MODE_SPIN;
-      }
+    case BTN_EVENT_CONFIRM:
+      cmd.command = CMD_CONFIRM;
+      break;
 
-      xQueueSend(xCommandQueue, &cmd, 0);
+    default:
+      continue; /* unknown gesture: nothing to forward */
     }
+
+    /* Timeout 0: never stall on a full queue. If the user mashes the buttons
+     * faster than WashingManager reads, the surplus presses are dropped. */
+    xQueueSend(xCommandQueue, &cmd, 0);
   }
 }

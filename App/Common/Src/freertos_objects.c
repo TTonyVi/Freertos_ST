@@ -76,15 +76,22 @@ EventGroupHandle_t xSystemEvents = NULL;
  * @brief  Create all FreeRTOS communication objects.
  *
  * Each xQueueCreate() call allocates memory from heap_4:
- *   - Queue control block (~76 bytes)
+ *   - Queue control block (80 bytes — sizeof(StaticQueue_t))
  *   - Storage buffer      (length × itemSize bytes)
  *
- * Approximate RAM cost:
- *   xButtonQueue   : ~96  bytes  (5 × sizeof(ButtonEvent_t) = 5 × 4)
- *   xCommandQueue  : ~136 bytes  (5 × sizeof(CommandMsg_t)  = 5 × 12)
- *   xDisplayQueue  : ~256 bytes  (5 × sizeof(DisplayMsg_t)  = 5 × 36)
- *   xSystemEvents  : ~76  bytes
- *   Total          : ~564 bytes  (out of 128 KB SRAM — negligible)
+ * RAM cost, MEASURED with arm-none-eabi-gcc using this project's flags
+ * (sizeof via a compile-time probe, not estimated):
+ *   xButtonQueue   :  85 bytes  (80 + 5 × sizeof(ButtonEvent_t) = 5 × 1)
+ *   xCommandQueue  :  85 bytes  (80 + 5 × sizeof(CommandMsg_t)  = 5 × 1)
+ *   xDisplayQueue  : 215 bytes  (80 + 5 × sizeof(DisplayMsg_t)  = 5 × 27)
+ *   xSystemEvents  :  28 bytes  (sizeof(StaticEventGroup_t))
+ *   Total          : 413 bytes, plus heap_4's per-allocation header and
+ *                    8-byte rounding (out of 128 KB SRAM — negligible)
+ *
+ * Why the item sizes are 1 / 1 / 27 and not 4 / 4 / 36: arm-none-eabi-gcc
+ * defaults to -fshort-enums, so an enum occupies the smallest integer that
+ * fits (1 byte here), not an int. Never assume sizeof(enum) == 4 on this
+ * toolchain — measure it.
  *
  * configASSERT() traps at boot if any allocation fails, ensuring a
  * heap misconfiguration is caught immediately rather than causing a
@@ -100,8 +107,9 @@ void App_FreeRTOSObjectsInit(void)
      *   uxItemSize    : size of each item IN BYTES — FreeRTOS copies this
      *                   many bytes on every send and receive
      *
-     * sizeof(ButtonEvent_t) = sizeof(int) = 4 bytes on Cortex-M4.
-     * The enum value is copied by value; no pointer is stored in the queue.
+     * sizeof(ButtonEvent_t) = 1 byte (-fshort-enums: smallest integer that
+     * fits, not int). The enum value is copied by value; no pointer is stored
+     * in the queue.
      * ----------------------------------------------------------------------- */
     xButtonQueue = xQueueCreate(BUTTON_QUEUE_LENGTH, sizeof(ButtonEvent_t));
     configASSERT(xButtonQueue != NULL);
@@ -109,10 +117,8 @@ void App_FreeRTOSObjectsInit(void)
     /* -----------------------------------------------------------------------
      * Command Queue
      *
-     * sizeof(CommandMsg_t) = sizeof(Command_t) + sizeof(WashMode_t)
-     *                      + sizeof(uint8_t) + 3 padding
-     *                      = 4 + 4 + 1 + 3 = 12 bytes.
-     * The full struct is copied into the queue storage on each send.
+     * sizeof(CommandMsg_t) = sizeof(Command_t) = 1 byte (short enum, no
+     * padding). The full struct is copied into the queue storage on each send.
      * ----------------------------------------------------------------------- */
     xCommandQueue = xQueueCreate(COMMAND_QUEUE_LENGTH, sizeof(CommandMsg_t));
     configASSERT(xCommandQueue != NULL);
@@ -120,7 +126,8 @@ void App_FreeRTOSObjectsInit(void)
     /* -----------------------------------------------------------------------
      * Display Queue
      *
-     * sizeof(DisplayMsg_t) = 4 + 4 + 1 + 3(padding) + 24 = 36 bytes.
+     * sizeof(DisplayMsg_t) = 1 (state) + 1 (selectedMode) + 1 (menuIndex)
+     *                      + 24 (statusText) = 27 bytes, no padding.
      * The statusText[24] char array is part of the struct and is copied
      * entirely — no heap string, no pointer, no fragmentation risk.
      * ----------------------------------------------------------------------- */

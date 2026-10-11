@@ -5,6 +5,67 @@ Cập nhật sau mỗi phiên Q&A trước khi bắt đầu viết code.
 
 ---
 
+## Session 17 — 2026-10-10 — Van cấp nước dừng theo cảm biến, không theo giờ
+
+**Yêu cầu:** "van xả nước vào lồng giặt lúc bấm giặt … xả đến lúc cảm biến báo đầy thì dừng
+chứ không xả theo thời gian nữa".
+
+**Hiểu nhầm lần đầu:** tôi tưởng là van xả (`DRAIN`) và đã sửa `DRAIN` kết thúc bằng bit
+`EVT_WATER_EMPTY`. Sai đối tượng — đã hoàn tác toàn bộ. Người dùng nói về **van cấp nước**.
+
+**Thực tế code:** `FILL_WATER` đã chờ `EVT_WATER_FULL | EVT_TIMEOUT | EVT_ERROR`; van cấp
+đóng khi cảm biến báo đầy. 10 s chỉ là timeout an toàn (hết giờ → `ERROR`). Chính tài liệu
+ghi "Bơm nước: 10 giây" khiến nó giống chạy theo giờ → đã sửa chữ trong START_HERE, SPEC.
+
+**Lỗi thật tìm thấy:** `EVT_WATER_FULL` không bao giờ bị xoá → bit cũ làm `FILL_WATER`
+ở chu trình sau kết thúc oan. Nay SensorTask xoá bit khi cảm biến báo cạn.
+
+---
+
+## Session 16 — 2026-10-10 — Một biến, một chủ: sửa lỗi `s_statusCache`
+
+**Chủ đề:** Khi viết Tầng 3 phát hiện UITask hiển thị trạng thái `IDLE` cũ và giữ
+một con trỏ menu riêng lệch với WashingManager. Sửa bằng cách dồn quyền sở hữu về
+WashingManager, rồi đồng bộ toàn bộ tài liệu.
+
+---
+
+### Q1: Sửa theo hướng nào?
+
+UITask có `s_statusCache` không bao giờ được ghi (luôn `IDLE`), và con trỏ menu
+tồn tại ở hai nơi. Ba phương án; chọn **hướng 2**: WashingManager giữ con trỏ và là
+bên duy nhất dựng `DisplayMsg_t`; UITask thành bộ dịch không trạng thái
+(`BTN_EVENT_NAVIGATE → CMD_NAVIGATE`, `CONFIRM → CMD_CONFIRM`). Hệ quả có chủ ý: nút
+bị bỏ qua lúc đang chạy chu trình.
+
+### Q2: `sizeof` của message là bao nhiêu?
+
+Tôi từng "sửa" comment thành 12/36 byte theo giả định enum = 4 byte — **sai**.
+Đo bằng probe `char (*p)[sizeof(T)] = 1;` cho ra 1/1/27 vì arm-none-eabi-gcc dùng
+`-fshort-enums`. Bài học: đo, đừng đoán.
+
+### Q3: Vì sao file có byte NUL?
+
+Một lớp xử lý chuỗi nuốt một nửa dấu `\` trong tham số Bash/node nên `\0` thành NUL.
+Sửa bằng mã ký tự; về sau dùng Edit/Write cho văn bản có backslash.
+
+### Q4: Kiểm chứng thế nào khi chưa nạp được board?
+
+Biên dịch sạch 0 cảnh báo; chạy mã thật của manager + SM trên host (37/37) và thử
+"đột biến" — đưa lại từng lỗi cũ, bộ test đều bắt được. **Chưa** kiểm chứng trên phần cứng.
+
+### Q5: Có nên bỏ UITask?
+
+Sau bản sửa nó chỉ đổi tên enum, và phản đối "manager phải chờ nhiều nguồn" gần như
+hết (nút không dùng lúc đang chạy). Về kỹ thuật bỏ được; chưa quyết định.
+
+### Ghi chú tài liệu
+
+SYSTEM_DIAGRAMS §1 tách thành 1a/1b/1c (mỗi sơ đồ ≤ ~800 px). Sơ đồ tuần tự §5 gãy vì
+dấu `;` trong `Note` (Mermaid coi là ngăn lệnh) — đã đổi thành dấu phẩy.
+
+---
+
 ## Session 15 — 2026-10-09 — Thiết kế lại HTML: sơ đồ zoom được
 
 **Chủ đề:** Sơ đồ kiến trúc trong `SYSTEM_DIAGRAMS.html` bị co cho vừa chiều rộng
@@ -107,6 +168,47 @@ sơ đồ làm quá nhiều việc**: 4 task + 3 queue + 1 event group + 4 timer
 2 ISR trong một hình, với rất nhiều đường chéo nhau. Ngay cả toàn màn hình vẫn chỉ
 vừa ở ~38 %. Hướng cải thiện (chưa làm, chờ quyết định): tách thành 3 sơ đồ —
 luồng nút bấm / luồng cảm biến + event group / luồng timer — mỗi cái dưới ~1200 px.
+
+---
+
+### Q2: Minh hoạ mục "7. RTOS Architecture" của PROJECT_SPEC bằng sơ đồ dễ nhìn
+
+**Hiện trạng:** mục 7 là chuỗi chữ xuống dòng với mũi tên `↓ ↑` ở giữa — 12 đoạn
+văn rời, người đọc phải tự ghép lại. Nó còn **thiếu Software Timer** dù mục 9 của
+chính đặc tả khai timer là nguồn của `EVT_TIMEOUT`.
+
+**Đã làm:** thay bằng một sơ đồ Mermaid trong `PROJECT_SPEC.md` (nguồn), kèm bảng
+chú giải ký hiệu và 3 dòng "Cách đọc". HTML tự cập nhật qua `npm run build`.
+
+**Quyết định thiết kế — vẽ qua 4 vòng lặp, mỗi vòng sửa đúng một lỗi nhìn thấy:**
+
+| Vòng | Bố cục | Lỗi nhìn thấy | Sửa |
+| --- | --- | --- | --- |
+| 1 | Ngang (`LR`) | Rộng **1668 px** → bị co còn 61 %, chữ nhỏ; nền vàng mặc định lệch tông | Đổi sang dọc (`TB`) → 807 px, đọc được ở 100 %; tô nền khung bằng màu xám **có độ trong suốt** để dùng được cả giao diện sáng lẫn tối |
+| 2 | Dọc | Mũi tên đi **xuyên qua tiêu đề** "③ Luồng hiển thị"; cao 990 px bị cắt | Nối `WM --> DSP` (vào **khung**, không vào node bên trong) → mũi tên dừng ở viền; đồng thời Mermaid tôn trọng `direction LR` bên trong khung ③ nên DQ → OLED nằm ngang, bớt một tầng |
+| 3 | + nén khoảng cách | Tham số `padding: 10` làm node **đè lên tiêu đề** ① ② | Bỏ `padding`; dùng `subGraphTitleMargin` chừa riêng chỗ cho tiêu đề |
+| 4 | Hoàn chỉnh | Cao 840 px, màn 900 px chỉ hiện ~740 → cắt đáy khung ③ | Sửa **bộ xem** (xem dưới) |
+
+**Bài học Mermaid đáng nhớ:** khi một khung con (`subgraph`) có node bị nối ra
+ngoài, `direction` bên trong bị **bỏ qua** và kế thừa hướng toàn cục. Nối vào
+**chính khung** (`WM --> DSP`) thay vì node bên trong thì hướng riêng được giữ.
+Mẹo này vừa tránh va chạm mũi tên–tiêu đề, vừa làm sơ đồ gọn hơn.
+
+**Cải tiến bộ xem rút ra từ sơ đồ này:** sơ đồ chỉ cao hơn khung một chút thì
+đọc trọn vẹn dễ hơn là phải cuộn. `viewer.js` giờ tự thu nhỏ **tối đa 30 %** để
+sơ đồ vừa khung; sơ đồ cao hơn nhiều (sequence diagram) vẫn giữ "vừa chiều rộng"
+rồi kéo dọc. Trên màn 900 px, sơ đồ này hiện trọn ở 85 %.
+
+**Kiểm chứng:** chụp ảnh Chrome thật ở sáng + tối sau mỗi vòng; chạy lại bộ test
+**25/25 đạt**. Một kiểm tra lúc đầu FAIL (`PROJECT_SPEC.html` kỳ vọng 1 sơ đồ,
+giờ có 2) — đây là FAIL **đúng**, vì nội dung đã thay đổi chủ ý; cập nhật con số
+kỳ vọng trong test chứ không "sửa cho test qua".
+
+**Khớp với code thật:** các bit event (`DOOR_CLOSED · WATER_FULL · TIMEOUT ·
+FINISHED · ERROR`), priority (UI 2, Sensor 2, Manager 3, OLED 1), chu kỳ Sensor
+100 ms đối chiếu với `app_events.h` / `app_config.h`. Sơ đồ vẫn theo **đặc tả**
+(có UI Task) — nếu sau này gộp UI Task vào Manager thì phải sửa cả mục 8, 9 chứ
+không riêng sơ đồ.
 
 ---
 

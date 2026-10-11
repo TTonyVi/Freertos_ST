@@ -164,13 +164,14 @@ Từ [app_config.h:19-28](../App/Common/Inc/app_config.h#L19-L28):
 
 | Giai đoạn | Hằng số | Thời gian |
 | --- | --- | --- |
-| Bơm nước (`FILL_WATER`) | `WASH_FILL_DURATION_MS` | 10 giây (hết giờ mà chưa đầy → lỗi) |
+| Bơm nước (`FILL_WATER`) | `WASH_FILL_DURATION_MS` | **Không phải thời gian bơm.** Van cấp mở **đến khi cảm biến báo đầy** (PD6); 10 giây chỉ là *hạn chót an toàn* — hết giờ mà chưa đầy → `ERROR` |
 | Giặt (`WASHING`) | `WASH_CYCLE_DURATION_MS` | 20 giây |
 | Xả (`DRAIN`) | `WASH_DRAIN_DURATION_MS` | 5 giây |
 | Vắt (`SPIN`) | `SPIN_DURATION_MS` | 10 giây |
 
-Chu trình đầy đủ: `IDLE → FILL_WATER → WASHING → DRAIN → SPIN → FINISH`,
-khoảng 45 giây.
+Chu trình đầy đủ: `IDLE → FILL_WATER → WASHING → DRAIN → SPIN → FINISH`.
+`WASHING` + `DRAIN` + `SPIN` cộng lại 35 giây; `FILL_WATER` dài bao lâu tuỳ lúc bạn
+bấm PD6 (cảm biến báo đầy), tối đa 10 giây.
 
 ## 0.4 Code thật — hệ thống khởi động thế nào
 
@@ -346,13 +347,13 @@ Timer giải quyết đúng mâu thuẫn đó: nó **biến việc hết giờ t
 Quay lại Kịch bản A ở Tầng 0. Chạy tới bước 4 — máy **đang giặt**, đèn xanh lá
 sáng, đồng hồ đếm 20 giây.
 
-Bây giờ, **trong lúc đang giặt**, bấm nút **PA0**.
+Bây giờ, **trong lúc đang giặt**, mở cửa: bấm nút **PD5**.
 
-Con trỏ trên OLED nhảy từ `> Wash` xuống `> Spin` **ngay lập tức**. Không có
-độ trễ. Trong khi đó đèn xanh lá vẫn sáng, chu trình giặt vẫn tiếp tục, và 20
-giây vẫn đếm đúng.
+Đèn xanh lá (motor) **tắt gần như ngay lập tức** và máy vào `ERROR`. Không phải
+chờ hết 20 giây. Vậy mà ngay trước đó, máy chỉ đang lặng lẽ đếm giờ.
 
-**Hai việc đang xảy ra cùng lúc trên một CPU một nhân.** Bằng cách nào?
+**Hai việc đang xảy ra cùng lúc trên một CPU một nhân:** đếm 20 giây giặt, và
+canh cánh cửa. Bằng cách nào?
 
 ## 1.2 Cách ngây thơ — superloop
 
@@ -385,7 +386,7 @@ while (1)
 
 | # | Hỏng ở đâu | Hậu quả cụ thể trên máy giặt |
 | --- | --- | --- |
-| 1 | `HAL_Delay(20000)` là **busy-wait** — CPU quay vòng rỗng 20 giây | Bấm PA0 lúc đang giặt → **không phản ứng gì trong 20 giây**. Người dùng tưởng máy hỏng |
+| 1 | `HAL_Delay(20000)` là **busy-wait** — CPU quay vòng rỗng 20 giây | Bấm bất kỳ nút nào lúc đang giặt → **không phản ứng gì trong 20 giây**. Người dùng tưởng máy hỏng |
 | 2 | Cảm biến cửa chỉ được đọc **sau khi** delay xong | Mở cửa giữa lúc giặt → lồng vẫn quay tiếp 20 giây rồi máy mới biết. **Nguy hiểm thật sự** |
 | 3 | OLED chỉ vẽ lại ở cuối mỗi vòng lặp | Màn hình đứng hình suốt chu trình |
 | 4 | Thêm tính năng mới = phải chèn vào đúng chỗ trong vòng lặp | Mỗi lần thêm chức năng lại phải tính lại timing của **toàn bộ** vòng lặp. Đến chức năng thứ 5 thì không ai dám sửa nữa |
@@ -486,7 +487,8 @@ câu này.
 
 **Đây chính là câu trả lời cho hiện tượng ở §1.1.** Trong 20 giây "đang giặt",
 WashingManager không hề bận — nó đang `Blocked`, ngủ, trả CPU về cho hệ thống.
-UITask do đó phản ứng với nút bấm ngay lập tức.
+SensorTask nhờ đó vẫn kiểm tra cánh cửa đều đặn, và khi cửa mở, WashingManager
+được đánh thức ngay để dừng motor.
 
 Nói cách khác: **RTOS biến thời gian chờ từ thứ bị lãng phí thành tài nguyên
 dùng được.**
@@ -510,8 +512,10 @@ void SensorTask(void *pvParameters) {
       xEventGroupSetBits(xSystemEvents, EVT_ERROR);
     }
 
-    if (BSP_Sensor_IsWaterFull()) {
+    if (BSP_Sensor_IsWaterFull()) {        /* bit nước theo đúng mức cảm biến  */
       xEventGroupSetBits(xSystemEvents, EVT_WATER_FULL);
+    } else {
+      xEventGroupClearBits(xSystemEvents, EVT_WATER_FULL);
     }
 
     vTaskDelay(pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS));  /* ④ ngủ 100 ms         */
@@ -575,26 +579,25 @@ thấy tận mắt.
 ### Thí nghiệm A — bằng chứng của `Blocked` (không sửa code)
 
 1. Chạy Kịch bản A tới bước 4 (đèn 🟢 sáng, đang giặt).
-2. Trong lúc đèn xanh lá đang sáng, bấm **PA0** vài lần.
+2. Bấm **PD5** (mở cửa) và nhìn đèn xanh lá.
 
-**✍ Dự đoán trước:** con trỏ OLED có nhảy không? Nhảy ngay hay phải đợi giặt
-xong? Chu kỳ giặt có bị kéo dài thêm không?
+**✍ Dự đoán trước:** đèn xanh lá tắt sau bao lâu — ngay, hay phải đợi hết 20 giây
+của chu kỳ giặt? Máy vào trạng thái nào?
 
-**Kết quả cần thấy:** con trỏ nhảy tức thì, đèn xanh lá không chớp, 20 giây vẫn
-đếm đúng.
+**Kết quả cần thấy:** đèn xanh lá tắt gần như ngay (chưa tới một phần năm giây),
+máy vào `ERROR`. Không có chuyện lồng vẫn quay nốt phần giặt còn lại.
 
-**Giải thích:** WashingManager đang `Blocked`. Việc nó "đang giặt" không tiêu
-tốn CPU chút nào — LED xanh chỉ là một chân GPIO đã được bật rồi để đấy.
+**Giải thích:** WashingManager đang `Blocked` — việc nó "đang giặt" không tiêu
+tốn CPU chút nào, LED xanh chỉ là một chân GPIO đã được bật rồi để đấy. Cũng
+chính vì nó chỉ *ngủ chờ* chứ không *bận đếm*, SensorTask (cứ 100 ms đọc cửa một
+lần) mới có CPU để thấy cửa mở, và WashingManager được đánh thức ngay để dừng
+motor. Đối chiếu với superloop ở §1.2, dòng 2: *"lồng vẫn quay tiếp 20 giây rồi
+máy mới biết"* — đây chính là điều RTOS đã chữa.
 
-> ⚠ **Bạn sẽ thấy thêm một thứ mà tài liệu này chưa giải thích:** dòng trạng thái
-> dưới cùng của OLED đổi từ `WASHING` thành `IDLE` ngay khi bạn bấm PA0, dù máy
-> vẫn đang giặt (đèn xanh lá vẫn sáng, 20 giây vẫn chạy). **Đây là một lỗi thật
-> của project, không phải hành vi đúng.** Đừng bận tâm ở tầng này — nguyên nhân
-> nằm ở cách hai task trao đổi dữ liệu, và Tầng 3 sẽ mổ xẻ nó tới tận gốc.
->
-> Hãy coi đây là bài tập đọc code đầu tiên: đèn LED vẫn đúng nhưng chữ trên màn
-> hình lại sai. Điều đó nói lên **hai thứ đó được điều khiển bởi hai đường khác
-> nhau.** Đường nào?
+> **Thử thêm:** vẫn trong lúc đang giặt, bấm **PA0** vài lần. Không có gì xảy ra —
+> con trỏ menu đứng im. Đó là **chủ ý thiết kế**: WashingManager chỉ đọc nút bấm
+> khi máy rảnh (`IDLE`, `FINISH`, `ERROR`). Vì sao nó chỉ đọc nút ở những lúc đó,
+> và nút bấm đi qua những đâu trước khi tới nó, là nội dung của Tầng 3.
 
 ### Thí nghiệm B — phá hệ thống bằng `HAL_Delay()`
 
@@ -856,8 +859,8 @@ lý do bốn task này tồn tại — mỗi task **nằm chờ một thứ khá
 
 | Task | Prio | Stack | Nằm chờ gì | Sở hữu gì |
 | --- | --- | --- | --- | --- |
-| **WashingManager** | **3** | 256 w | Lệnh từ người dùng **hoặc** sự kiện hệ thống — tùy trạng thái | **Máy trạng thái** + motor, van, đèn |
-| **UITask** | **2** | 128 w | Sự kiện nút bấm (do ISR đẩy tới) | Con trỏ menu |
+| **WashingManager** | **3** | 256 w | Lệnh từ người dùng **hoặc** sự kiện hệ thống — tùy trạng thái | **Máy trạng thái** + **con trỏ menu** + motor, van, đèn |
+| **UITask** | **2** | 128 w | Sự kiện nút bấm (do ISR đẩy tới) | Không giữ trạng thái nào — chỉ đổi cử chỉ nút bấm thành lệnh |
 | **SensorTask** | **2** | 128 w | **Không chờ ai** — chạy định kỳ 100 ms | Trạng thái cảm biến cửa/nước |
 | **OLEDTask** | **1** | 256 w | Yêu cầu vẽ màn hình | **Toàn quyền truy cập OLED / I2C1** |
 
@@ -934,13 +937,13 @@ Ba lợi ích, xếp theo mức quan trọng tăng dần:
 Đây là bằng chứng trực tiếp cho tiêu chí 1. Bốn dòng, lấy từ bốn file khác nhau:
 
 ```c
-/* UITask — chờ nút bấm            (ui_task.c:57)      */
+/* UITask — chờ nút bấm            (ui_task.c:49)      */
 xQueueReceive(xButtonQueue, &event, portMAX_DELAY);
 
-/* OLEDTask — chờ yêu cầu vẽ       (oled_task.c:57)    */
+/* OLEDTask — chờ yêu cầu vẽ       (oled_task.c:55)    */
 xQueueReceive(xDisplayQueue, &msg, portMAX_DELAY);
 
-/* WashingManager — chờ lệnh       (washing_manager.c:254) */
+/* WashingManager — chờ lệnh       (washing_manager.c:287) */
 xQueueReceive(xCommandQueue, &cmd, portMAX_DELAY);
 
 /* SensorTask — không chờ ai, tự ngủ theo nhịp (sensor_task.c:34) */
@@ -956,7 +959,7 @@ tới khi có dữ liệu, tiêu thụ 0 % CPU.
 ### (b) WashingManager: chờ thứ gì tùy theo đang ở trạng thái nào
 
 Đây là chỗ đặc biệt nhất project. Vòng lặp chính của WashingManager
-([washing_manager.c:239-257](../App/WashingManager/Src/washing_manager.c#L239-L257)),
+([washing_manager.c:272-290](../App/WashingManager/Src/washing_manager.c#L272-L290)),
 rút gọn:
 
 ```c
@@ -1008,7 +1011,12 @@ Hai quy tắc sở hữu của project, ghi trong [CLAUDE.md](../CLAUDE.md):
 | Tài nguyên | Chủ sở hữu duy nhất | Task khác muốn dùng thì |
 | --- | --- | --- |
 | Máy trạng thái | WashingManager | Gửi lệnh vào `xCommandQueue` |
+| Con trỏ menu | WashingManager | Gửi `CMD_NAVIGATE` vào `xCommandQueue` |
 | Màn OLED + bus I2C1 | OLEDTask | Gửi nội dung vào `xDisplayQueue` |
+
+> **Con trỏ menu từng có hai chủ** — UITask giữ một bản, WashingManager giữ một
+> bản khác — và hậu quả là một lỗi màn hình có thật. Câu chuyện đó ở Tầng 3 §3.6;
+> hiện tại chỉ còn một bản, nằm trong WashingManager.
 
 Vì sao OLED phải có chủ: nếu hai task cùng gọi `ssd1306_UpdateScreen()`, hai
 giao dịch I2C sẽ đè lên nhau giữa chừng — màn hình hiện rác, hoặc bus treo. Cách
@@ -1016,7 +1024,7 @@ chữa thông thường là dùng **mutex** để khóa. Nhưng project chọn c
 an toàn hơn: **chỉ cho đúng một task chạm vào**. Không có tranh chấp thì không
 cần khóa.
 
-Nhìn lại [oled_task.c:55-59](../App/OLEDTask/Src/oled_task.c#L55-L59): OLEDTask
+Nhìn lại [oled_task.c:53-57](../App/OLEDTask/Src/oled_task.c#L53-L57): OLEDTask
 chỉ có hai việc — nhận tin, vẽ. Nó **không chứa một chút logic máy giặt nào**.
 Đây gọi là **pure renderer**: nó không biết máy giặt là gì, nó chỉ biết vẽ cái
 người ta đưa cho.
@@ -1038,7 +1046,7 @@ Chứng minh trực tiếp cho §2.4(b): nguồn chờ thay đổi theo trạng 
 | # | Thao tác | Quan sát |
 | --- | --- | --- |
 | 1 | Reset board (đang ở `IDLE`) | Không đèn nào sáng |
-| 2 | Bấm **PD6** vài lần | ? |
+| 2 | Bấm **PD6** hai lần (đầy rồi lại cạn) | ? |
 | 3 | Bấm **PD2** (Start) | 🟠 + 🔵 sáng — vào `FILL_WATER` |
 | 4 | Bấm **PD6** một lần | ? |
 
@@ -1061,7 +1069,9 @@ chọn nguồn chờ, không phải bằng câu `if`.**
 *(Chi tiết "tin rơi vào hư không" thực ra không hoàn toàn đúng — bit vẫn nằm
 trong event group và có thể gây hiệu ứng phụ ở trạng thái sau. Đó gọi là
 **sticky flag**, một cái bẫy thật của project này, phân tích đầy đủ ở
-[LEARNING_NOTES §3](LEARNING_NOTES.md). Tầng 4 sẽ nói tới.)*
+[LEARNING_NOTES §3](LEARNING_NOTES.md). Tầng 4 sẽ nói tới. Riêng bit nước hiện
+là bit **theo mức**: SensorTask xoá `EVT_WATER_FULL` ngay khi cảm biến báo cạn,
+nên bit cũ của chu trình trước không thể làm `FILL_WATER` kết thúc oan.)*
 
 ---
 
@@ -1076,7 +1086,7 @@ dòng**:
 ```
 
 **Bước 2 — ✍ dự đoán.** Dữ kiện: PD13 vốn là van cấp nước (đèn cam). Thứ tự lệnh
-trong callback vào `WASHING` là [washing_manager.c:80-86](../App/WashingManager/Src/washing_manager.c#L80-L86):
+trong callback vào `WASHING` là [washing_manager.c:84-90](../App/WashingManager/Src/washing_manager.c#L84-L90):
 đóng van INLET **trước**, rồi mới bật motor.
 
 > - Vào `WASHING`, đèn nào sáng? Đèn xanh lá có sáng lần nào trong cả chu trình không?
@@ -1136,11 +1146,11 @@ không liên quan gì tới nhau.
 | **Stack size** | Call chain sâu bao nhiêu, biến cục bộ lớn cỡ nào | Task cần *bao nhiêu RAM* để chạy |
 
 Vì sao OLEDTask cần nhiều stack dù chẳng gấp gáp gì: nhìn chuỗi gọi hàm của nó
-ở [oled_task.c:22-41](../App/OLEDTask/Src/oled_task.c#L22-L41) —
+ở [oled_task.c:22-39](../App/OLEDTask/Src/oled_task.c#L22-L39) —
 `OLEDTask` → `OLED_Render()` → `BSP_OLED_DrawText()` → `ssd1306_WriteString()` →
 `ssd1306_WriteChar()` → ... xuống tới HAL I2C. Mỗi tầng gọi hàm đều đẩy thêm một
-khung stack. Cộng thêm biến cục bộ `DisplayMsg_t msg` (36 byte) nằm ngay trên
-stack của task ([oled_task.c:53](../App/OLEDTask/Src/oled_task.c#L53)).
+khung stack. Cộng thêm biến cục bộ `DisplayMsg_t msg` (27 byte) nằm ngay trên
+stack của task ([oled_task.c:51](../App/OLEDTask/Src/oled_task.c#L51)).
 
 Ngược lại, SensorTask ([sensor_task.c](../App/SensorTask/Src/sensor_task.c)) chỉ
 đọc hai chân GPIO và set vài bit — call chain nông, gần như không có biến cục
@@ -1166,7 +1176,7 @@ phụ thuộc lịch sử chạy trước đó.
 **Điều đó có nguy hiểm không? Không** — vì hai task này **không tranh chấp gì của
 nhau**:
 
-- UITask đọc `xButtonQueue`, ghi `xCommandQueue` và `xDisplayQueue`.
+- UITask đọc `xButtonQueue`, ghi `xCommandQueue`.
 - SensorTask đọc GPIO, ghi `xSystemEvents`.
 - Không có biến chung, không có tài nguyên chung.
 
@@ -1285,13 +1295,13 @@ mất khi bạn đặt breakpoint.
 **④ Struct bị đọc nửa vời — nguy hiểm nhất.** Với dữ liệu nhiều trường:
 
 ```c
-volatile DisplayMsg_t g_display;   /* 36 byte */
+volatile DisplayMsg_t g_display;   /* 27 byte */
 ```
 
 Task A ghi xong `menuIndex`, chưa kịp ghi `statusText` thì bị task B chen vào
 đọc. Task B nhận được **một nửa dữ liệu mới ghép với một nửa dữ liệu cũ** — một
 trạng thái chưa từng tồn tại trong ý định của ai cả. `volatile` không giúp được
-gì: nó không làm cho 36 byte trở nên nguyên tử.
+gì: nó không làm cho 27 byte trở nên nguyên tử.
 
 Lỗi ④ là loại khiến kỹ sư mất hàng tuần: hệ thống chạy đúng 99.9 % thời gian,
 và cái 0.1 % còn lại không tài nào bắt được bằng debugger, vì dừng chương trình
@@ -1315,7 +1325,7 @@ Tính chất 4 là điểm người mới hiểu sai nhiều nhất, nên nói k
 xQueueSend(xDisplayQueue, &disp, 0);
 /*                        ^^^^^                                    */
 /*  Truyền ĐỊA CHỈ vào hàm, nhưng FreeRTOS KHÔNG lưu địa chỉ đó.   */
-/*  Nó copy 36 byte từ địa chỉ đó vào vùng nhớ của queue NGAY LẬP  */
+/*  Nó copy 27 byte từ địa chỉ đó vào vùng nhớ của queue NGAY LẬP  */
 /*  TỨC, trong lúc hàm còn đang chạy. Sau khi hàm return, biến     */
 /*  `disp` của bạn không còn liên quan gì tới queue nữa.           */
 ```
@@ -1325,14 +1335,14 @@ bị thu hồi, dữ liệu vẫn an toàn trong queue. Nếu queue lưu con tr�
 lỗi dangling pointer kinh điển.
 
 Cái giá phải trả: mỗi lần gửi và mỗi lần nhận đều tốn một phép `memcpy`. Với
-`DisplayMsg_t` 36 byte trên Cortex-M4 thì không đáng kể. Với dữ liệu **lớn**
+`DisplayMsg_t` 27 byte trên Cortex-M4 thì không đáng kể. Với dữ liệu **lớn**
 (vài KB, ví dụ một buffer ảnh) thì mới cần cân nhắc gửi con trỏ — nhưng lúc đó
 bạn phải tự trả lời: ai cấp phát, ai giải phóng, và bên nhận đọc xong chưa?
 Queue theo giá trị không đặt ra câu hỏi nào trong ba câu đó.
 
 ## 3.4 Code thật — ba queue của project
 
-Tạo tại [freertos_objects.c:106-127](../App/Common/Src/freertos_objects.c#L106-L127):
+Tạo tại [freertos_objects.c:114-134](../App/Common/Src/freertos_objects.c#L114-L134):
 
 ```c
 xButtonQueue  = xQueueCreate(BUTTON_QUEUE_LENGTH,  sizeof(ButtonEvent_t));
@@ -1343,9 +1353,18 @@ xDisplayQueue = xQueueCreate(DISPLAY_QUEUE_LENGTH, sizeof(DisplayMsg_t));
 
 | Queue | Chở gì | Bên gửi | Bên nhận | Sâu | 1 phần tử |
 | --- | --- | --- | --- | --- | --- |
-| `xButtonQueue` | `ButtonEvent_t` | **ISR** nút bấm | UITask | 5 | 4 byte |
-| `xCommandQueue` | `CommandMsg_t` | UITask | WashingManager | 5 | 12 byte |
-| `xDisplayQueue` | `DisplayMsg_t` | WashingManager *(và UITask — xem §3.6)* | OLEDTask | 5 | 36 byte |
+| `xButtonQueue` | `ButtonEvent_t` | **ISR** nút bấm | UITask | 5 | 1 byte |
+| `xCommandQueue` | `CommandMsg_t` | UITask | WashingManager | 5 | 1 byte |
+| `xDisplayQueue` | `DisplayMsg_t` | WashingManager *(duy nhất — xem §3.6)* | OLEDTask | 5 | 27 byte |
+
+> **Vì sao 1 / 1 / 27 mà không phải 4 / 4 / 36?** Cột cuối là số **đo thật** bằng
+> `arm-none-eabi-gcc` với đúng cờ biên dịch của project. Trình biên dịch này mặc
+> định dùng `-fshort-enums`: một `enum` chiếm số byte nhỏ nhất đủ chứa giá trị
+> (ở đây là 1), không phải 4 byte như một `int`. Nhiều tài liệu và ví dụ trên mạng
+> ngầm giả định `sizeof(enum) == 4`; trên toolchain này điều đó **sai**, và cũng
+> từng sai trong chính comment của project cho tới khi được đo lại. Quy tắc:
+> **kích thước kiểu dữ liệu thì đo, đừng đoán** — một dòng
+> `char (*p)[sizeof(T)] = 1;` làm trình biên dịch tự in ra con số.
 
 Ba queue tạo thành một **dây chuyền một chiều**:
 
@@ -1369,8 +1388,8 @@ Cùng một hàm `xQueueSend`/`xQueueReceive`, tham số cuối đổi ý nghĩa
 
 | Giá trị | Nghĩa | Dùng ở đâu trong project |
 | --- | --- | --- |
-| `portMAX_DELAY` | Chờ vô hạn. Task `Blocked` tới khi có dữ liệu | Mọi chỗ **nhận**: [ui_task.c:57](../App/UITask/Src/ui_task.c#L57), [oled_task.c:57](../App/OLEDTask/Src/oled_task.c#L57), [washing_manager.c:254](../App/WashingManager/Src/washing_manager.c#L254) |
-| `0` | **Không chờ.** Queue đầy thì trả về `errQUEUE_FULL` ngay | Mọi chỗ **gửi**: [ui_task.c:68](../App/UITask/Src/ui_task.c#L68), [ui_task.c:81](../App/UITask/Src/ui_task.c#L81), `Manager_PostDisplay` |
+| `portMAX_DELAY` | Chờ vô hạn. Task `Blocked` tới khi có dữ liệu | Mọi chỗ **nhận**: [ui_task.c:49](../App/UITask/Src/ui_task.c#L49), [oled_task.c:55](../App/OLEDTask/Src/oled_task.c#L55), [washing_manager.c:287](../App/WashingManager/Src/washing_manager.c#L287) |
+| `0` | **Không chờ.** Queue đầy thì trả về `errQUEUE_FULL` ngay | Mọi chỗ **gửi** từ task: [ui_task.c:68](../App/UITask/Src/ui_task.c#L68) (gửi lệnh), [washing_manager.c:184](../App/WashingManager/Src/washing_manager.c#L184) (`Manager_PostDisplay`). Riêng ISR dùng bản `FromISR` ở [ui_task.c:32](../App/UITask/Src/ui_task.c#L32) |
 | `pdMS_TO_TICKS(n)` | Chờ tối đa n ms rồi bỏ cuộc | Không dùng trong project này |
 
 **Vì sao mọi chỗ gửi đều dùng timeout 0** — đây là một quyết định thiết kế, không
@@ -1385,14 +1404,14 @@ nghiêm trọng.
 Với timeout 0, cập nhật hiển thị bị **rơi lặng lẽ** khi quá tải. Đánh đổi này
 đúng vì màn hình là dữ liệu *tự làm mới*: bỏ một khung hình thì khung sau vẫn
 vẽ đúng. Ghi rõ trong comment ở
-[washing_manager.c:137-142](../App/WashingManager/Src/washing_manager.c#L137-L142).
+[washing_manager.c:165-173](../App/WashingManager/Src/washing_manager.c#L165-L173).
 
 Quy tắc chung mang được sang project khác: **bên gửi ở priority cao không bao
 giờ được block chờ bên nhận ở priority thấp.**
 
 ### Gửi từ ISR phải dùng hàm khác
 
-[ui_task.c:32-38](../App/UITask/Src/ui_task.c#L32-L38):
+[ui_task.c:29-35](../App/UITask/Src/ui_task.c#L29-L35):
 
 ```c
 static void Button_EventCallback(ButtonEvent_t event) {
@@ -1416,40 +1435,44 @@ tồn tại `xHigherPriorityTaskWoken`, `portYIELD_FROM_ISR` làm gì — để 
 Đây là thí nghiệm quyết định của tầng. Nếu bạn tin rằng "truyền `&disp` nghĩa là
 queue giữ địa chỉ của `disp`" thì kết quả dưới đây sẽ sửa lại niềm tin đó.
 
-**Bước 1 —** mở [ui_task.c:68](../App/UITask/Src/ui_task.c#L68), thêm **một dòng
-ngay sau** lệnh gửi:
+**Bước 1 —** mở [washing_manager.c:184](../App/WashingManager/Src/washing_manager.c#L184),
+trong hàm `Manager_PostDisplay()`, thêm **một dòng ngay sau** lệnh gửi:
 
 ```c
-      xQueueSend(xDisplayQueue, &disp, 0);
-      disp.menuIndex = 99u;      /* ← thí nghiệm, sẽ hoàn tác */
+    xQueueSend(xDisplayQueue, &msg, 0);
+    msg.menuIndex = 99u;      /* ← thí nghiệm, sẽ hoàn tác */
+}
 ```
 
 **Bước 2 — ✍ dự đoán.** Nhớ rằng `OLED_Render()` vẽ con trỏ bằng
-`msg->menuIndex == 0u ? "> Wash" : "  Wash"` ([oled_task.c:32-35](../App/OLEDTask/Src/oled_task.c#L32-L35)),
+`msg->menuIndex == 0u ? "> Wash" : "  Wash"` ([oled_task.c:30-33](../App/OLEDTask/Src/oled_task.c#L30-L33)),
 nên `menuIndex = 99` sẽ khiến **không dòng nào có dấu `>`**.
 
-> - Bấm PA0. Con trỏ `>` còn hiện không?
-> - `disp` là biến cục bộ trong `while(1)` của UITask. Đến lúc OLEDTask
->   (priority 1, thấp nhất) chạy tới, khung stack đó còn tồn tại không?
+> - Bấm PA0 lúc máy đang rảnh. Con trỏ `>` còn hiện không?
+> - `msg` là biến cục bộ của `Manager_PostDisplay()`. Hàm này **đã return** từ
+>   rất lâu trước khi OLEDTask (priority 1, thấp nhất) được chạy tới. Khung stack
+>   chứa `msg` lúc OLEDTask đọc queue còn tồn tại không?
 
-**Bước 3 —** build, nạp, bấm PA0 vài lần.
+**Bước 3 —** build, nạp, bấm PA0 vài lần (và thử cả một chu trình đầy đủ).
 
 ### ⛔ Dừng lại — viết dự đoán ra giấy xong mới đọc tiếp
 
 ### Kết quả và giải thích
 
-**Con trỏ vẫn nhảy đúng.** Dòng `disp.menuIndex = 99u;` không có một chút ảnh
-hưởng nào.
+**Con trỏ vẫn nhảy đúng.** Dòng `msg.menuIndex = 99u;` không có một chút ảnh
+hưởng nào, kể cả trong một chu trình đầy đủ.
 
-Vì `xQueueSend()` đã **copy 36 byte vào vùng nhớ riêng của queue ngay trong lúc
-hàm còn chạy**. Khi hàm return, mọi liên hệ giữa biến `disp` và queue đã chấm
-dứt. Bạn sửa `disp` sau đó cũng như sửa một tờ giấy đã photo xong — bản photo
-không đổi.
+Vì `xQueueSend()` đã **copy 27 byte vào vùng nhớ riêng của queue ngay trong lúc
+hàm còn chạy**. Khi hàm return, mọi liên hệ giữa biến `msg` và queue đã chấm
+dứt. Bạn sửa `msg` sau đó cũng như sửa một tờ giấy đã photo xong — bản photo
+không đổi. (Và `s_menuIndex` của WashingManager cũng không bị đụng tới: `msg` chỉ
+là một bản sao.)
 
-Câu hỏi thứ hai còn sắc hơn: `disp` nằm trên **stack của UITask**. UITask gửi
-xong thì quay lại đầu vòng lặp và `Blocked` trên `xButtonQueue`; khung stack
-chứa `disp` bị coi như rác và sẽ bị ghi đè bởi lần lặp sau. OLEDTask (priority
-1) có thể mãi tới vài chục mili-giây sau mới được chạy.
+Câu hỏi thứ hai còn sắc hơn: `msg` nằm trên **stack**, trong khung của
+`Manager_PostDisplay()`. Hàm return là khung đó bị thu hồi ngay lập tức — không
+phải "sẽ bị ghi đè lần lặp sau", mà là **không còn tồn tại** — rồi WashingManager
+còn chạy tiếp và dùng lại đúng vùng stack ấy cho các lời gọi khác. OLEDTask
+(priority 1) có thể mãi tới vài chục mili-giây sau mới được chạy.
 
 **Nếu queue lưu con trỏ, đây sẽ là lỗi dangling pointer 100 % lần nào cũng
 dính.** Việc màn hình luôn vẽ đúng chính là bằng chứng cứng rằng queue đã chụp
@@ -1498,21 +1521,25 @@ thứ đã hết ý nghĩa.** Khi hệ thống đổi chế độ hoạt động
 đang nằm chờ trong queue có còn đúng cho chế độ mới không?"* Nếu không, phải chủ
 động dọn.
 
-## 3.6 Một lỗi thật trong chính project này
+## 3.6 Một lỗi thật trong chính project này — và cách nó được sửa
 
-Tầng này có thêm một mục ngoài khuôn, vì nó là ví dụ quá tốt và bạn đã gặp nó
-tận mắt từ Tầng 1.
+Tầng này có thêm một mục ngoài khuôn, vì nó là ví dụ quá tốt về **hai chủ cho một
+dữ liệu**. Lỗi này **đã được sửa**; phần mô tả "bản cũ" dưới đây là để bạn hiểu vì
+sao sửa như vậy (code trước khi sửa nằm trong lịch sử git).
 
-**Triệu chứng:** đang giặt, bấm PA0 để di chuyển con trỏ menu → dòng trạng thái
-dưới cùng của OLED đổi từ `WASHING` thành `IDLE`, dù máy vẫn đang giặt.
+### Triệu chứng của bản cũ
 
-**Truy nguyên.** UITask cũng gửi vào `xDisplayQueue` khi con trỏ di chuyển
-([ui_task.c:62-68](../App/UITask/Src/ui_task.c#L62-L68)). Nhưng `DisplayMsg_t`
-chứa **cả cụm** — `menuIndex` *và* `statusText`. UITask chỉ biết `menuIndex`; nó
-không biết máy đang ở trạng thái nào, nên lấy tạm từ một biến đệm:
+Đang giặt, bấm PA0 để di chuyển con trỏ menu → dòng trạng thái dưới cùng của OLED
+đổi từ `WASHING` thành `IDLE`, dù máy vẫn đang giặt.
+
+### Truy nguyên
+
+Bản cũ của UITask cũng gửi vào `xDisplayQueue` mỗi khi con trỏ di chuyển. Nhưng
+`DisplayMsg_t` chứa **cả cụm** — `menuIndex` *và* `statusText`. UITask chỉ biết
+`menuIndex`; nó không biết máy đang ở trạng thái nào, nên lấy tạm từ một biến đệm:
 
 ```c
-static char s_statusCache[24] = "IDLE";   /* ui_task.c:46 */
+static char s_statusCache[24] = "IDLE";   /* ui_task.c, bản cũ */
 ```
 
 Grep cả file: **`s_statusCache` không bao giờ được ghi.** Nó nằm nguyên giá trị
@@ -1521,34 +1548,110 @@ status text from last WashingManager display update"* — nhưng không có dòn
 nào thực hiện việc cache đó, và cũng **không thể có**: `xDisplayQueue` là kênh
 một chiều `WashingManager → OLEDTask`, UITask không đọc nó.
 
-**Đây không phải lỗi đánh máy — đây là lỗi thiết kế kênh liên lạc**, và đúng chủ
-đề của tầng này:
+**Đây không phải lỗi đánh máy — đây là lỗi thiết kế kênh liên lạc:**
 
 | Vấn đề gốc | Hai producer (WashingManager và UITask) cùng gửi vào một queue, nhưng mỗi bên **chỉ biết một phần** của thông điệp |
 | --- | --- |
-| Hệ quả | Bên nào gửi cũng phải bịa nốt phần mình không biết. UITask bịa `statusText`; WashingManager bịa `menuIndex` |
-| Vi phạm nguyên tắc | Tiêu chí ownership ở Tầng 2: **nội dung màn hình đang có hai chủ** |
+| Hệ quả | Bên nào gửi cũng phải bịa nốt phần mình không biết. UITask bịa `statusText`; WashingManager giữ một bản sao `menuIndex` riêng |
+| Vi phạm nguyên tắc | Tiêu chí ownership ở Tầng 2: **nội dung màn hình có hai chủ** |
 
-Một chi tiết phụ củng cố chẩn đoán: UITask khai `DisplayMsg_t disp;` rồi chỉ gán
-`menuIndex` và `statusText`, **để nguyên `state` và `selectedMode` chưa khởi
-tạo** — và queue trung thành copy đủ 36 byte, kể cả hai trường rác đó. Hiện chưa
-gây triệu chứng vì `OLED_Render()` không dùng tới chúng, nhưng nó cho thấy chính
-người viết cũng cảm nhận được rằng UITask không có đủ thông tin để dựng một
-`DisplayMsg_t` hoàn chỉnh.
+Và lỗi lệch này còn lộ ra **từ phía ngược lại**: bản sao `menuIndex` của
+WashingManager chỉ được cập nhật khi nó nhận một lệnh. Sau khi UITask đã dời con
+trỏ lúc đang giặt, tới lần chuyển trạng thái kế tiếp WashingManager gửi
+`menuIndex` cũ của nó — **con trỏ trên OLED nhảy ngược về chỗ cũ.** Hai bản sao
+của cùng một dữ liệu thì sớm muộn sẽ bất đồng.
 
-**Ba hướng sửa** (chưa áp dụng — để bạn tự cân nhắc trước khi đọc tiếp các tầng
-sau):
+Một chi tiết phụ: UITask khai `DisplayMsg_t disp;` rồi chỉ gán `menuIndex` và
+`statusText`, **để nguyên `state` và `selectedMode` chưa khởi tạo** — queue vẫn
+trung thành copy đủ 27 byte kể cả hai trường rác đó. Chính người viết cũng đã
+cảm nhận được rằng UITask không đủ thông tin để dựng một `DisplayMsg_t` hoàn chỉnh.
+
+### Ba hướng sửa được cân nhắc
 
 | Hướng | Cách làm | Đánh đổi |
 | --- | --- | --- |
-| **1. OLEDTask nhớ trạng thái** | Thêm trường `updateMask` vào `DisplayMsg_t`; OLEDTask giữ bản sao khung hình gần nhất và chỉ ghi đè phần được đánh dấu | Sửa ít nhất; nhưng OLEDTask không còn là *pure renderer* |
-| **2. UITask không gửi thẳng OLED** | UITask gửi lệnh "cursor moved" cho WashingManager; WashingManager — bên duy nhất biết đủ mọi thứ — dựng `DisplayMsg_t` và gửi đi | Đúng nguyên tắc một chủ nhất; thêm một chặng, con trỏ phản hồi chậm hơn chút |
-| **3. Tách hai queue** | Một queue cho trạng thái, một cho con trỏ; OLEDTask ghép lại | Rõ ràng nhất về quyền sở hữu; tốn thêm RAM và một chỗ chờ |
+| **1. OLEDTask nhớ trạng thái** | Thêm `updateMask` vào `DisplayMsg_t`; OLEDTask giữ khung hình gần nhất và chỉ ghi đè phần được đánh dấu | Sửa ít nhất; nhưng OLEDTask không còn là *pure renderer*, và bản sao `menuIndex` thứ hai vẫn còn đó |
+| **2. UITask không gửi thẳng OLED** | UITask báo "con trỏ đã dời" cho WashingManager; WashingManager dựng `DisplayMsg_t` | Đúng nguyên tắc một chủ — **nhưng xem bên dưới** |
+| **3. Tách hai queue** | Một queue cho trạng thái, một cho con trỏ; OLEDTask ghép lại | Ranh giới sạch nhất; tốn RAM và thêm một chỗ chờ |
 
-Hướng 2 hợp với nguyên tắc thiết kế của project nhất (*WashingManager là chủ duy
-nhất của trạng thái*). Nhưng ghi nhận trung thực: cả ba đều là lựa chọn hợp lệ,
-và việc chọn hướng nào phụ thuộc điều bạn coi trọng hơn — ít code hay ranh giới
-sở hữu sạch.
+### Vì sao không làm đúng như hướng 2 ban đầu
+
+Khi viết ra mới thấy hướng 2 *như đã mô tả* vẫn còn lỗ. WashingManager chỉ đọc
+`xCommandQueue` ở `IDLE / FINISH / ERROR` (Tầng 2) — lúc đang giặt nó nằm chờ trên
+event group. Nên lệnh "con trỏ đã dời" gửi lúc đang giặt sẽ **nằm im trong queue
+rồi bị `xQueueReset` xoá** khi máy về `FINISH`. UITask vẫn tin con trỏ ở vị trí
+mới, màn hình thì ở vị trí cũ, và bấm Start sẽ chạy chương trình **khác với cái
+đang hiển thị**. Vẫn là hai chủ, chỉ đổi chỗ lệch.
+
+Lời giải đúng không phải là *báo* cho nhau, mà là **chỉ còn một bản**: chuyển hẳn
+quyền sở hữu con trỏ sang WashingManager.
+
+### Cách sửa thật sự
+
+UITask thành **bộ dịch không trạng thái** — chỉ đổi tên cử chỉ thành lệnh, không
+biết con trỏ ở đâu hay máy đang làm gì ([ui_task.c:49-68](../App/UITask/Src/ui_task.c#L49-L68)):
+
+```c
+BTN_EVENT_NAVIGATE  →  CMD_NAVIGATE
+BTN_EVENT_CONFIRM   →  CMD_CONFIRM
+```
+
+WashingManager giữ con trỏ và là **bên duy nhất** dựng `DisplayMsg_t`
+([washing_manager.c:200-228](../App/WashingManager/Src/washing_manager.c#L200-L228)):
+
+```c
+case CMD_NAVIGATE:
+    s_menuIndex = (uint8_t)((s_menuIndex + 1u) % MENU_ITEM_COUNT);
+    Manager_PostDisplay(state);      /* chữ trạng thái dựng từ trạng thái THẬT */
+    break;
+
+case CMD_CONFIRM:
+    if (state == WASH_STATE_FINISH || state == WASH_STATE_ERROR)
+        WashingSM_ProcessEvent(WASH_EVT_RESET);        /* xác nhận, về IDLE   */
+    else if (s_menuIndex == 0u)
+        { s_currentMode = WASH_MODE_WASH; WashingSM_ProcessEvent(WASH_EVT_START_WASH); }
+    else
+        { s_currentMode = WASH_MODE_SPIN; WashingSM_ProcessEvent(WASH_EVT_START_SPIN); }
+    break;
+```
+
+Ba hệ quả đáng thấy:
+
+1. **`CommandMsg_t` co từ 3 byte xuống còn 1 byte** (số đo thật; comment cũ ghi 8, rồi 12 — đều sai). Nó không cần
+   mang `menuIndex` và `mode` nữa — hai thông tin đó giờ nằm trong người nhận.
+2. **Chữ trạng thái không còn là chuỗi truyền tay.** `Manager_StatusText()` là một
+   bảng duy nhất, tra theo trạng thái — nên chữ trên màn hình không thể lệch với
+   trạng thái, như một chuỗi truyền tay (hay một biến đệm không ai ghi) từng lệch.
+3. **Một cái giá, nói thẳng:** lúc máy đang chạy chu trình, nút bấm bị bỏ qua và
+   con trỏ đứng im (bạn đã thử ở Tầng 1, "Thử thêm" của Thí nghiệm A). Đây là hệ
+   quả trực tiếp của việc WashingManager chỉ chờ **một** nguồn tại một thời điểm.
+   Nó hợp lý — giữa chu trình không có gì để chọn — và nó cũng chính là lý do
+   không thể "gộp UITask vào WashingManager" mà không cân nhắc cơ chế chờ.
+
+### Kiểm chứng
+
+- `make clean && make all`: **0 warning**. Vùng `data` giảm đúng **24 byte**
+  (44 → 20) — bằng đúng mảng `s_statusCache[24]`: bằng chứng cứng rằng biến đó từng
+  chiếm RAM thật mà chưa từng được ghi.
+- **Chưa thử trên board.** Thay vào đó, logic thật được chạy trên PC: biên dịch
+  nguyên `washing_manager.c` và `washing_sm.c` của project, chỉ giả lập FreeRTOS và
+  BSP. **37 kiểm tra đạt**, gồm cả kịch bản lỗi gốc (con trỏ dời lúc đang giặt phải
+  hiện `WASHING`, không phải `IDLE`) và kịch bản con trỏ nhảy ngược.
+- **Kiểm tra đột biến:** cố tình đưa lỗi cũ trở lại (gửi cứng chữ `IDLE`; cho
+  `CMD_NAVIGATE` reset trạng thái cuối; không tăng con trỏ) → bài test báo hỏng cả
+  ba lần. Một bài test chưa từng được thấy *thất bại* thì chưa chứng minh được gì.
+
+### Bài học
+
+1. **Hai bản sao của một dữ liệu thì sớm muộn sẽ lệch.** Cách sửa đúng là *bỏ một
+   bản*, không phải *đồng bộ hai bản*.
+2. **Một thông điệp nên do đúng một bên biết đủ dựng ra.** Hai bên cùng gửi, mỗi
+   bên một nửa, là công thức của dữ liệu rác.
+3. **Chạy thử một đề xuất thiết kế qua mọi trạng thái trước khi tin nó.** Hướng 2
+   nghe hợp lý và chỉ hỏng ở đúng một trạng thái: lúc đang giặt.
+4. **Sau khi sửa, UITask chỉ còn ~25 dòng và đổi tên 1-1.** Câu hỏi "có cần task
+   này nữa không" xuất hiện rất tự nhiên — nhưng đó là một quyết định khác, chưa
+   được đưa ra.
 
 ## 3.7 Tự kiểm tra
 
@@ -1556,15 +1659,15 @@ Tự trả lời trước, rồi đọc phần giải thích ngay bên dưới.
 
 ---
 
-**Câu 1. `xDisplayQueue` sâu 5 và mỗi phần tử 36 byte. Nếu đổi
+**Câu 1. `xDisplayQueue` sâu 5 và mỗi phần tử 27 byte. Nếu đổi
 `DisplayMsg_t.statusText` từ `char[24]` thành `char *`, RAM tiết kiệm được bao
 nhiêu, và cái giá phải trả là gì?**
 
-**Trả lời:** tiết kiệm khoảng `5 × 20 = 100 byte`, và cái giá là **đánh đổi một
-bug tiềm ẩn nghiêm trọng lấy 100 byte trên tổng 128 KB SRAM** — hoàn toàn không
+**Trả lời:** tiết kiệm khoảng `5 × 19 = 95 byte`, và cái giá là **đánh đổi một
+bug tiềm ẩn nghiêm trọng lấy 95 byte trên tổng 128 KB SRAM** — hoàn toàn không
 đáng.
 
-`char *` chỉ 4 byte, nên phần tử co từ 36 xuống 16 byte. Nhưng khi đó queue chở
+`char *` chỉ 4 byte, nên phần tử co từ 27 xuống 8 byte (3 trường nhỏ + 1 byte đệm căn lề + 4 byte con trỏ). Nhưng khi đó queue chở
 **địa chỉ**, và câu hỏi lập tức phát sinh: chuỗi mà địa chỉ đó trỏ tới nằm ở đâu?
 
 | Chuỗi nằm ở đâu | Chuyện gì xảy ra |
@@ -1583,7 +1686,7 @@ bộ nhớ.
 
 ---
 
-**Câu 2. Cả ba chỗ gửi trong project đều dùng timeout `0`, tức là chấp nhận mất
+**Câu 2. Cả hai chỗ gửi từ task trong project đều dùng timeout `0`, tức là chấp nhận mất
 dữ liệu khi queue đầy. Với `xCommandQueue` — queue chở lệnh của người dùng —
 việc mất lệnh có chấp nhận được không?**
 
@@ -1604,7 +1707,7 @@ hệ thống nhiều task.
 
 Cách làm chuẩn hơn cho lệnh người dùng: kiểm tra giá trị trả về của
 `xQueueSend()` và báo cho người dùng biết khi thất bại (nháy đèn, kêu bíp). Hiện
-project bỏ qua giá trị trả về ở cả ba chỗ gửi — chấp nhận được với quy mô này,
+project bỏ qua giá trị trả về ở cả hai chỗ gửi từ task — chấp nhận được với quy mô này,
 nhưng trong sản phẩm thật thì phải xử lý.
 
 ---

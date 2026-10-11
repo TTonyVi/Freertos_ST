@@ -27,8 +27,12 @@ void SensorTask(void *pvParameters) {
       xEventGroupSetBits(xSystemEvents, EVT_ERROR);
     }
 
+    /* Level-style: mirror the sensor, so a stale FULL bit cannot survive into
+     * the next cycle's FILL_WATER. */
     if (BSP_Sensor_IsWaterFull()) {
       xEventGroupSetBits(xSystemEvents, EVT_WATER_FULL);
+    } else {
+      xEventGroupClearBits(xSystemEvents, EVT_WATER_FULL);
     }
 
     vTaskDelay(pdMS_TO_TICKS(SENSOR_TASK_PERIOD_MS));

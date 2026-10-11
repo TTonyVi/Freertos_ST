@@ -271,7 +271,7 @@ img { max-width: 100%; }
 <header class="topbar">
   <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
   <a class="brand" href="#top">Washing Machine Simulator</a>
-  <nav class="docnav" aria-label="Bộ tài liệu"><a href="START_HERE.html">Học FreeRTOS</a><a href="SYSTEM_DIAGRAMS.html" aria-current="page">Sơ đồ hệ thống</a><a href="../PROJECT_SPEC.html">Đặc tả</a></nav>
+  <nav class="docnav" aria-label="Bộ tài liệu"><a href="START_HERE.html">Học FreeRTOS</a><a href="SYSTEM_DIAGRAMS.html" aria-current="page">Sơ đồ hệ thống</a><a href="../PROJECT_SPEC.html">Đặc tả</a><a href="LEARNING_NOTES.html">Ghi chú học tập</a></nav>
   <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
 </header>
 <div class="layout" id="top">
@@ -299,75 +299,155 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 <hr>
 <h2 id="1-kiến-trúc-tổng-thể--tasks--communication-objects">1. Kiến trúc tổng thể — Tasks &amp; Communication Objects<a class="anchor" href="#1-kiến-trúc-tổng-thể--tasks--communication-objects" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Mô tả: <strong>Ai</strong> giao tiếp với <strong>ai</strong> thông qua <strong>cơ chế nào</strong>.</p>
-<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
-    %% --- Hardware layer ---
-    HW_BTN[&quot;B1 Button (PA0)\nShort press: navigate&quot;]
-    HW_PD2[&quot;Start Button (PD2)\nPress: confirm/start&quot;]
-    HW_PD5[&quot;Door Btn (PD5)\nToggle door&quot;]
-    HW_PD6[&quot;Water Btn (PD6)\nToggle water&quot;]
-    HW_OLED[&quot;OLED SSD1306 (I2C)&quot;]
-    HW_MOTOR[&quot;Motor GPIO (PD12)&quot;]
-    HW_INLET[&quot;Inlet Valve GPIO (PD13)&quot;]
-    HW_DRAIN[&quot;Drain Valve GPIO (PD14)&quot;]
-    HW_LED[&quot;Status LED GPIO (PD15)&quot;]
+<p>Hệ thống có ba luồng dữ liệu độc lập, đều hội tụ ở <strong>WashingManager</strong>. Mỗi luồng
+một sơ đồ riêng để đọc cho dễ; chú giải màu dùng chung cho cả ba:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Màu / hình</th>
+<th>Loại đối tượng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🟠 bầu dục</td>
+<td><strong>ISR</strong> — chạy trong ngắt, chỉ ghi vào queue rồi thoát</td>
+</tr>
+<tr>
+<td>🔵 hộp chữ nhật</td>
+<td><strong>Task</strong></td>
+</tr>
+<tr>
+<td>🟢 hình trụ</td>
+<td><strong>Queue</strong> (FIFO, sao chép theo giá trị)</td>
+</tr>
+<tr>
+<td>🟣 hộp đôi</td>
+<td><strong>Event Group</strong></td>
+</tr>
+<tr>
+<td>⚪ hình thoi nghiêng</td>
+<td><strong>Software Timer</strong></td>
+</tr>
+<tr>
+<td>⬜ hộp xám</td>
+<td><strong>Phần cứng</strong> (nút bấm, LED, OLED)</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="1a-luồng-lệnh-người-dùng--từ-nút-bấm-tới-màn-hình">1a. Luồng lệnh người dùng — từ nút bấm tới màn hình<a class="anchor" href="#1a-luồng-lệnh-người-dùng--từ-nút-bấm-tới-màn-hình" aria-label="Liên kết tới mục này">#</a></h3>
+<p>Nút bấm → ISR → <code>xButtonQueue</code> → UITask → <code>xCommandQueue</code> → WashingManager →
+<code>xDisplayQueue</code> → OLEDTask → màn hình. UITask <strong>không giữ trạng thái nào</strong> và không
+gửi gì tới OLED; WashingManager sở hữu con trỏ menu và là bên duy nhất dựng
+<code>DisplayMsg_t</code>.</p>
+<div class="dg-slot"><figure class="diagram" data-src="%%{init: {&quot;flowchart&quot;: {&quot;rankSpacing&quot;: 38, &quot;nodeSpacing&quot;: 40}}}%%
+flowchart TB
+    HW_BTN[&quot;&lt;b&gt;B1 (PA0)&lt;/b&gt;&lt;br/&gt;nhấn: chuyển mục menu&quot;]
+    HW_PD2[&quot;&lt;b&gt;Start (PD2)&lt;/b&gt;&lt;br/&gt;nhấn: xác nhận / bắt đầu&quot;]
 
-    %% --- ISR layer ---
-    ISR_BTN[&quot;EXTI0_IRQHandler\n─────────────────\nBSP_Button_IRQHandler()\nDebounce \u2192 NAVIGATE only\n[ISR CONTEXT]&quot;]
-    ISR_PD2[&quot;EXTI2_IRQHandler\n─────────────────\nBSP_StartButton_IRQHandler()\nFalling edge \u2192 CONFIRM\n[ISR CONTEXT]&quot;]
-    TMR_CB[&quot;Timer_PhaseCallback()\n─────────────────\nset EVT_TIMEOUT\n[Timer Service Task]&quot;]
+    ISR_BTN([&quot;&lt;b&gt;EXTI0 ISR&lt;/b&gt;&lt;br/&gt;BSP_Button_IRQHandler&lt;br/&gt;chống dội · NAVIGATE&quot;])
+    ISR_PD2([&quot;&lt;b&gt;EXTI2 ISR&lt;/b&gt;&lt;br/&gt;BSP_StartButton_IRQHandler&lt;br/&gt;chống dội · CONFIRM&quot;])
 
-    %% --- Queue / Event objects ---
-    Q_BTN[(&quot;xButtonQueue\n─────────────\nItem: ButtonEvent_t\nDepth: 5\nISR → UITask&quot;)]
-    Q_CMD[(&quot;xCommandQueue\n─────────────\nItem: CommandMsg_t\nDepth: 5\nUITask → WashMgr&quot;)]
-    Q_DSP[(&quot;xDisplayQueue\n─────────────\nItem: DisplayMsg_t\nDepth: 5\nWashMgr → OLED&quot;)]
-    EG[[&quot;xSystemEvents\n─────────────────────\nBit0 EVT_DOOR_CLOSED\nBit1 EVT_WATER_FULL\nBit2 EVT_TIMEOUT\nBit3 EVT_FINISHED\nBit4 EVT_ERROR&quot;]]
+    Q_BTN[(&quot;&lt;b&gt;xButtonQueue&lt;/b&gt;&lt;br/&gt;ButtonEvent_t · sâu 5&lt;br/&gt;ISR → UITask&quot;)]
+    UI[&quot;&lt;b&gt;UITask&lt;/b&gt; · Prio 2&lt;br/&gt;đổi tên nút bấm thành lệnh&lt;br/&gt;(không giữ trạng thái)&quot;]
+    Q_CMD[(&quot;&lt;b&gt;xCommandQueue&lt;/b&gt;&lt;br/&gt;CommandMsg_t · sâu 5&lt;br/&gt;UITask → WashingManager&quot;)]
+    WASH[&quot;&lt;b&gt;WashingManager&lt;/b&gt; · Prio 3&lt;br/&gt;chủ máy trạng thái&lt;br/&gt;chủ con trỏ menu&quot;]
+    Q_DSP[(&quot;&lt;b&gt;xDisplayQueue&lt;/b&gt;&lt;br/&gt;DisplayMsg_t · sâu 5&lt;br/&gt;WashingManager → OLEDTask&quot;)]
+    OLED[&quot;&lt;b&gt;OLEDTask&lt;/b&gt; · Prio 1&lt;br/&gt;chỉ vẽ, không logic&quot;]
+    HW_OLED[&quot;&lt;b&gt;OLED SSD1306&lt;/b&gt;&lt;br/&gt;I2C1&quot;]
 
-    %% --- Timers ---
-    T1[/&quot;xFillTimeoutTimer\nOne-shot 10 s&quot;/]
-    T2[/&quot;xWashTimer\nOne-shot 20 s&quot;/]
-    T3[/&quot;xDrainTimer\nOne-shot 5 s&quot;/]
-    T4[/&quot;xSpinTimer\nOne-shot 10 s&quot;/]
-
-    %% --- Tasks ---
-    UI[&quot;UITask  Prio=2\n─────────────────\nMenu cursor\nButton interpreter&quot;]
-    WASH[&quot;WashingManager  Prio=3\n─────────────────\nState machine owner\nActuator control&quot;]
-    SENSOR[&quot;SensorTask  Prio=2\n─────────────────\nPoll door + water\nevery 100 ms&quot;]
-    OLED[&quot;OLEDTask  Prio=1\n─────────────────\nOnly renderer\nNever blocks others&quot;]
-
-    %% --- Connections ---
-    HW_BTN --&gt;|&quot;RISING/FALLING edge&quot;| ISR_BTN
-    ISR_BTN --&gt;|&quot;xQueueSendFromISR\nBTN_EVENT_NAVIGATE&quot;| Q_BTN
-    HW_PD2 --&gt;|&quot;FALLING edge EXTI2&quot;| ISR_PD2
-    ISR_PD2 --&gt;|&quot;xQueueSendFromISR\nBTN_EVENT_CONFIRM&quot;| Q_BTN
-    Q_BTN --&gt;|&quot;xQueueReceive\nblocks&quot;| UI
-    UI --&gt;|&quot;xQueueSend&quot;| Q_CMD
-    UI --&gt;|&quot;xQueueSend\n(cursor move — BTN_EVENT_NAVIGATE)&quot;| Q_DSP
-
-    Q_CMD --&gt;|&quot;xQueueReceive\nblocks (IDLE state)&quot;| WASH
-    WASH --&gt;|&quot;xQueueSend&quot;| Q_DSP
-    Q_DSP --&gt;|&quot;xQueueReceive\nblocks&quot;| OLED
+    HW_BTN --&gt;|&quot;cạnh lên/xuống&quot;| ISR_BTN
+    HW_PD2 --&gt;|&quot;cạnh xuống&quot;| ISR_PD2
+    ISR_BTN --&gt;|&quot;xQueueSendFromISR&quot;| Q_BTN
+    ISR_PD2 --&gt;|&quot;xQueueSendFromISR&quot;| Q_BTN
+    Q_BTN --&gt;|&quot;xQueueReceive&lt;br/&gt;(chặn)&quot;| UI
+    UI --&gt;|&quot;xQueueSend&lt;br/&gt;CMD_NAVIGATE / CMD_CONFIRM&quot;| Q_CMD
+    Q_CMD --&gt;|&quot;xQueueReceive&lt;br/&gt;(chỉ ở IDLE · FINISH · ERROR)&quot;| WASH
+    WASH --&gt;|&quot;xQueueSend&lt;br/&gt;(mỗi khi đổi trạng thái / con trỏ)&quot;| Q_DSP
+    Q_DSP --&gt;|&quot;xQueueReceive&lt;br/&gt;(chặn)&quot;| OLED
     OLED --&gt;|&quot;I2C write&quot;| HW_OLED
 
-    HW_PD5 --&gt;|&quot;Polled 100 ms\nBSP_Sensor_Poll()&quot;| SENSOR
-    HW_PD6 --&gt;|&quot;Polled 100 ms\nBSP_Sensor_Poll()&quot;| SENSOR
-    SENSOR --&gt;|&quot;xEventGroupSetBits\nDOOR_CLOSED / WATER_FULL&quot;| EG
-    SENSOR --&gt;|&quot;xEventGroupSetBits\nEVT_ERROR (door open)&quot;| EG
-    EG --&gt;|&quot;xEventGroupWaitBits\nblocks mid-cycle&quot;| WASH
+    classDef hw    fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef queue fill:#e3f6e8,stroke:#2f9e44,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    class HW_BTN,HW_PD2,HW_OLED hw
+    class ISR_BTN,ISR_PD2 isr
+    class UI,OLED task
+    class Q_BTN,Q_CMD,Q_DSP queue
+    class WASH hub
+"></figure></div>
+<blockquote>
+<p><strong>Lưu ý khi đọc:</strong> WashingManager chỉ đọc <code>xCommandQueue</code> ở <code>IDLE</code>, <code>FINISH</code>,
+<code>ERROR</code>. Lúc đang chạy chu trình nó chờ trên event group (sơ đồ 1b), nên nút bấm
+trong thời gian đó bị bỏ qua — chủ ý thiết kế, xem START_HERE Tầng 3 §3.6.</p>
+</blockquote>
+<h3 id="1b-luồng-sự-kiện-hệ-thống--cảm-biến-timer-và-event-group">1b. Luồng sự kiện hệ thống — cảm biến, timer và event group<a class="anchor" href="#1b-luồng-sự-kiện-hệ-thống--cảm-biến-timer-và-event-group" aria-label="Liên kết tới mục này">#</a></h3>
+<p>SensorTask (định kỳ) và các Software Timer (khi hết giờ) <strong>set bit</strong> vào
+<code>xSystemEvents</code>; WashingManager <strong>chờ</strong> đúng những bit có nghĩa ở trạng thái hiện
+tại. WashingManager cũng là bên <em>khởi động</em> timer (trong entry-action của từng
+trạng thái) và tự set <code>EVT_FINISHED</code> / <code>EVT_ERROR</code>.</p>
+<div class="dg-slot"><figure class="diagram" data-src="%%{init: {&quot;flowchart&quot;: {&quot;rankSpacing&quot;: 42, &quot;nodeSpacing&quot;: 40}}}%%
+flowchart TB
+    HW_PD5[&quot;&lt;b&gt;Door (PD5)&lt;/b&gt;&lt;br/&gt;bật/tắt cửa&quot;]
+    HW_PD6[&quot;&lt;b&gt;Water (PD6)&lt;/b&gt;&lt;br/&gt;bật/tắt mực nước&quot;]
 
-    WASH --&gt;|&quot;xTimerStart\n(entry action)&quot;| T1 &amp; T2 &amp; T3 &amp; T4
-    T1 &amp; T2 &amp; T3 &amp; T4 --&gt;|&quot;fires callback&quot;| TMR_CB
-    TMR_CB --&gt;|&quot;xEventGroupSetBits\nEVT_TIMEOUT\n(Timer Svc Task, KHÔNG phải ISR)&quot;| EG
-    WASH --&gt;|&quot;xEventGroupSetBits\nEVT_FINISHED / EVT_ERROR&quot;| EG
+    SENSOR[&quot;&lt;b&gt;SensorTask&lt;/b&gt; · Prio 2&lt;br/&gt;đọc PD5 · PD6 mỗi 100 ms&quot;]
+    EG[[&quot;&lt;b&gt;xSystemEvents&lt;/b&gt;&lt;br/&gt;Bit0 DOOR_CLOSED · Bit1 WATER_FULL&lt;br/&gt;Bit2 TIMEOUT · Bit3 FINISHED · Bit4 ERROR&quot;]]
+    WASH[&quot;&lt;b&gt;WashingManager&lt;/b&gt; · Prio 3&lt;br/&gt;chờ đúng bit có nghĩa&lt;br/&gt;ở trạng thái hiện tại&quot;]
+    TMRS[/&quot;&lt;b&gt;4 Software Timer&lt;/b&gt; (one-shot)&lt;br/&gt;Fill 10 s (timeout an toàn) · Wash 20 s&lt;br/&gt;Drain 5 s · Spin 10 s&quot;/]
+    TMR_CB[&quot;&lt;b&gt;Timer_PhaseCallback()&lt;/b&gt;&lt;br/&gt;chạy trong Timer Service Task&lt;br/&gt;(không phải ISR)&quot;]
 
-    WASH --&gt;|&quot;BSP calls&quot;| HW_MOTOR &amp; HW_INLET &amp; HW_DRAIN &amp; HW_LED
+    HW_PD5 --&gt;|&quot;đọc mỗi 100 ms&quot;| SENSOR
+    HW_PD6 --&gt;|&quot;đọc mỗi 100 ms&quot;| SENSOR
+    SENSOR --&gt;|&quot;set DOOR_CLOSED / WATER_FULL&lt;br/&gt;set ERROR khi cửa mở&quot;| EG
+    EG --&gt;|&quot;xEventGroupWaitBits&lt;br/&gt;(chặn giữa chu trình)&quot;| WASH
+    WASH --&gt;|&quot;xTimerStart&lt;br/&gt;(entry-action)&quot;| TMRS
+    TMRS --&gt;|&quot;hết giờ&quot;| TMR_CB
+    TMR_CB --&gt;|&quot;set EVT_TIMEOUT&quot;| EG
+    WASH --&gt;|&quot;set FINISHED / ERROR&quot;| EG
+
+    classDef hw    fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef event fill:#f1e6ff,stroke:#9333ea,stroke-width:2px,color:#1f2328
+    classDef timer fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    class HW_PD5,HW_PD6 hw
+    class SENSOR,TMR_CB task
+    class EG event
+    class TMRS timer
+    class WASH hub
+"></figure></div>
+<h3 id="1c-luồng-điều-khiển-ngoại-vi--washingmanager--bsp--chân-gpio">1c. Luồng điều khiển ngoại vi — WashingManager → BSP → chân GPIO<a class="anchor" href="#1c-luồng-điều-khiển-ngoại-vi--washingmanager--bsp--chân-gpio" aria-label="Liên kết tới mục này">#</a></h3>
+<p>WashingManager <strong>không bao giờ chạm HAL</strong>: nó gọi các hàm <code>BSP_*</code>, lớp BSP mới biết
+chân nào là chân nào. Đổi chân hay đổi phần cứng chỉ sửa trong <code>App/BSP/</code>.</p>
+<div class="dg-slot"><figure class="diagram" data-src="%%{init: {&quot;flowchart&quot;: {&quot;rankSpacing&quot;: 40, &quot;nodeSpacing&quot;: 30}}}%%
+flowchart TB
+    WASH[&quot;&lt;b&gt;WashingManager&lt;/b&gt; · Prio 3&lt;br/&gt;entry-action của từng trạng thái&quot;]
+    BSP[&quot;&lt;b&gt;Lớp BSP&lt;/b&gt;&lt;br/&gt;bsp_motor · bsp_valve · bsp_led&quot;]
+    MOTOR[&quot;&lt;b&gt;Motor&lt;/b&gt;&lt;br/&gt;PD12 · LD4 xanh lá&quot;]
+    INLET[&quot;&lt;b&gt;Van cấp nước&lt;/b&gt;&lt;br/&gt;PD13 · LD3 cam&quot;]
+    DRAIN[&quot;&lt;b&gt;Van xả&lt;/b&gt;&lt;br/&gt;PD14 · LD5 đỏ&quot;]
+    LED[&quot;&lt;b&gt;Đèn báo bận&lt;/b&gt;&lt;br/&gt;PD15 · LD6 xanh dương&quot;]
+
+    WASH --&gt;|&quot;BSP_Motor_Start/Stop&lt;br/&gt;BSP_Valve_Open/Close&lt;br/&gt;BSP_LED_On/Off&quot;| BSP
+    BSP --&gt;|&quot;HAL_GPIO_WritePin&quot;| MOTOR &amp; INLET &amp; DRAIN &amp; LED
+
+    classDef hw    fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    class MOTOR,INLET,DRAIN,LED hw
+    class BSP task
+    class WASH hub
 "></figure></div>
 <hr>
 <h2 id="2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp">2. State Machine — Tất cả trạng thái và chuyển tiếp<a class="anchor" href="#2-state-machine--tất-cả-trạng-thái-và-chuyển-tiếp" aria-label="Liên kết tới mục này">#</a></h2>
 <div class="dg-slot"><figure class="diagram" data-src="stateDiagram-v2
     [*] --&gt; IDLE : Power on
 
-    IDLE --&gt; FILL_WATER : CMD_START_WASH\n[xCommandQueue]
-    IDLE --&gt; SPIN       : CMD_START_SPIN\n[xCommandQueue]
+    IDLE --&gt; FILL_WATER : CMD_CONFIRM (con trỏ = Wash)\n[xCommandQueue]
+    IDLE --&gt; SPIN       : CMD_CONFIRM (con trỏ = Spin)\n[xCommandQueue]
 
     FILL_WATER --&gt; WASHING : EVT_WATER_FULL\n[xSystemEvents Bit1]
     FILL_WATER --&gt; ERROR   : EVT_TIMEOUT (10 s)\n[xFillTimeoutTimer → Bit2]
@@ -382,8 +462,8 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
     SPIN --&gt; FINISH : EVT_TIMEOUT (10 s)\n[xSpinTimer → Bit2]
     SPIN --&gt; ERROR  : EVT_ERROR\n[xSystemEvents Bit4]
 
-    FINISH --&gt; IDLE : CMD_RESET / Start press\n[xCommandQueue / mapped in WashMgr]
-    ERROR  --&gt; IDLE : CMD_RESET / Start press\n[xCommandQueue / mapped in WashMgr]
+    FINISH --&gt; IDLE : CMD_CONFIRM (xác nhận)\n[xCommandQueue]
+    ERROR  --&gt; IDLE : CMD_CONFIRM (xác nhận)\n[xCommandQueue]
 
     note right of FILL_WATER
         Inlet valve OPEN
@@ -415,6 +495,9 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 <hr>
 <h2 id="3-kịch-bản-a--full-wash-cycle-bình-thường">3. Kịch bản A — Full Wash Cycle (Bình thường)<a class="anchor" href="#3-kịch-bản-a--full-wash-cycle-bình-thường" aria-label="Liên kết tới mục này">#</a></h2>
 <p><strong>Trigger:</strong> User nhấn PD2 (Start button) khi cursor ở &quot;Wash&quot;</p>
+<blockquote>
+<p><strong>Thứ tự &quot;Render&quot;:</strong> <code>xQueueSend</code> chỉ đưa OLEDTask (Prio 1) sang <code>Ready</code>; WashingManager (Prio 3) vẫn chạy tiếp cho tới khi tự block (<code>xQueueReceive</code> / <code>xEventGroupWaitBits</code>). Chỉ lúc đó OLEDTask mới được chạy và vẽ — nên trong sơ đồ, &quot;Render&quot; nằm <strong>sau</strong> dòng block của WashingManager.</p>
+</blockquote>
 <div class="dg-slot"><figure class="diagram" data-src="sequenceDiagram
     actor User
     participant ISR0 as EXTI0 ISR (PA0)
@@ -427,35 +510,44 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 
     Note over User,OLED: ── Khởi động ──
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)&lt;br/&gt;menuIndex=0
-    OLED-&gt;&gt;OLED: Render: title + Wash/Spin menu + &quot;IDLE&quot;
+    Note right of OLED: OLEDTask Ready nhưng CHƯA chạy (Prio 1 &lt; 3)
+    WASH-&gt;&gt;WASH: xQueueReceive(xCommandQueue) → BLOCKED
+    OLED-&gt;&gt;OLED: Render: title + Wash/Spin menu + &quot;IDLE&quot;&lt;br/&gt;(chạy khi WashingManager đã block)
 
-    Note over User,OLED: ── User điều hướng menu (short press PA0) ──
-    User-&gt;&gt;ISR0: Nhấn nhanh PA0
+    Note over User,OLED: ── User điều hướng menu (nhấn PA0) ──
+    User-&gt;&gt;ISR0: Nhấn PA0
     ISR0-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
-    UI-&gt;&gt;UI: menuIndex = 1 (Spin)
-    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=1 &quot;IDLE&quot;)
+    UI-&gt;&gt;WASH: xQueueSend(CMD_NAVIGATE)
+    WASH-&gt;&gt;WASH: menuIndex = 1 (Spin)
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=1 &quot;IDLE&quot;)
+    WASH-&gt;&gt;WASH: quay lại xQueueReceive → BLOCKED
     OLED-&gt;&gt;OLED: Render: cursor trên &quot;Spin&quot;
 
-    User-&gt;&gt;ISR0: Nhấn nhanh PA0 lần 2
+    User-&gt;&gt;ISR0: Nhấn PA0 lần 2
     ISR0-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_NAVIGATE)
-    UI-&gt;&gt;UI: menuIndex = 0 (Wash)
-    UI-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=0 &quot;IDLE&quot;)
+    UI-&gt;&gt;WASH: xQueueSend(CMD_NAVIGATE)
+    WASH-&gt;&gt;WASH: menuIndex = 0 (Wash)
+    WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg menuIndex=0 &quot;IDLE&quot;)
+    WASH-&gt;&gt;WASH: quay lại xQueueReceive → BLOCKED
     OLED-&gt;&gt;OLED: Render: cursor trở về &quot;Wash&quot;
 
     Note over User,OLED: ── User xác nhận (nhấn PD2) ──
     User-&gt;&gt;ISR1: Nhấn PD2 (Start button)
     ISR1-&gt;&gt;UI: xQueueSendFromISR(BTN_EVENT_CONFIRM)
-    UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH, WASH_MODE_WASH, menuIndex=0)
+    UI-&gt;&gt;WASH: xQueueSend(CMD_CONFIRM)
+    WASH-&gt;&gt;WASH: IDLE + menuIndex == 0 → WASH_EVT_START_WASH
 
     Note over User,OLED: ── FILL_WATER phase ──
     WASH-&gt;&gt;WASH: SM: IDLE → FILL_WATER
     WASH-&gt;&gt;WASH: BSP_Valve_Open(INLET) + BSP_LED_On()
     WASH-&gt;&gt;WASH: xTimerStart(xFillTimeoutTimer, 10 s)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;FILL WATER&quot;)
-    OLED-&gt;&gt;OLED: Render &quot;FILL WATER&quot;
+    Note right of OLED: OLEDTask chuyển Ready nhưng CHƯA chạy:&lt;br/&gt;Prio 1 &lt; WashingManager Prio 3 → không preempt
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_WATER_FULL|EVT_TIMEOUT|EVT_ERROR)
-    Note right of WASH: BLOCKED — waiting for water
+    Note right of WASH: BLOCKED — waiting for water&lt;br/&gt;CPU rảnh → OLEDTask mới được chạy
+
+    OLED-&gt;&gt;OLED: Render &quot;FILL WATER&quot;
 
     loop Polling every 100 ms
         SENS-&gt;&gt;SENS: BSP_Sensor_Poll() → PD6 toggle detected
@@ -471,10 +563,10 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
     WASH-&gt;&gt;WASH: BSP_Valve_Close(INLET) + BSP_Motor_Start()
     WASH-&gt;&gt;WASH: xTimerStart(xWashTimer, 20 s)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;WASHING&quot;)
-    OLED-&gt;&gt;OLED: Render &quot;WASHING&quot;
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_TIMEOUT|EVT_ERROR)
     Note right of WASH: BLOCKED — waiting 20 s
+    OLED-&gt;&gt;OLED: Render &quot;WASHING&quot; (chạy khi WashingManager đã block)
 
     TMR--&gt;&gt;WASH: xWashTimer fires → xEventGroupSetBits(EVT_TIMEOUT)&lt;br/&gt;(Timer Service Task context, không phải ISR)
     WASH-&gt;&gt;WASH: Unblocked: EVT_TIMEOUT
@@ -501,13 +593,14 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
     WASH-&gt;&gt;WASH: xEventGroupSetBits(EVT_FINISHED)
     WASH-&gt;&gt;WASH: xQueueReset(xCommandQueue) (clear stale commands)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;FINISHED&quot;)
-    OLED-&gt;&gt;OLED: Render &quot;FINISHED&quot;
+    WASH-&gt;&gt;WASH: xQueueReceive(xCommandQueue) → BLOCKED
+    OLED-&gt;&gt;OLED: Render &quot;FINISHED&quot; (chạy khi WashingManager đã block)
 
     Note over User,OLED: ── User acknowledge (nhấn PD2) ──
     User-&gt;&gt;ISR1: Nhấn PD2
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
-    UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
-    WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
+    UI-&gt;&gt;WASH: xQueueSend(CMD_CONFIRM)
+    WASH-&gt;&gt;WASH: CMD_CONFIRM ở FINISH → WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: FINISH → IDLE
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
 "></figure></div>
@@ -524,17 +617,18 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 
     User-&gt;&gt;ISR1: Nhấn PD2 (cursor = Spin)
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
-    UI-&gt;&gt;WASH: xQueueSend(CMD_START_SPIN, WASH_MODE_SPIN, menuIndex=1)
+    UI-&gt;&gt;WASH: xQueueSend(CMD_CONFIRM)
+    WASH-&gt;&gt;WASH: IDLE + menuIndex == 1 → WASH_EVT_START_SPIN
 
     Note over WASH: SM: IDLE → SPIN&lt;br/&gt;(skip FILL_WATER, WASHING, DRAIN)
 
     WASH-&gt;&gt;WASH: BSP_Valve_Close(DRAIN) + BSP_Motor_Start()
     WASH-&gt;&gt;WASH: xTimerStart(xSpinTimer, 10 s)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;SPINNING&quot;)
-    OLED-&gt;&gt;OLED: Render &quot;SPINNING&quot;
 
     WASH-&gt;&gt;WASH: xEventGroupWaitBits(EVT_TIMEOUT | EVT_ERROR)
     Note right of WASH: BLOCKED 10 s
+    OLED-&gt;&gt;OLED: Render &quot;SPINNING&quot; (chạy khi WashingManager đã block)
 
     TMR--&gt;&gt;WASH: xSpinTimer fires → EVT_TIMEOUT
     WASH-&gt;&gt;WASH: SM: SPIN → FINISH
@@ -544,8 +638,8 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 
     User-&gt;&gt;ISR1: Nhấn PD2
     ISR1-&gt;&gt;UI: BTN_EVENT_CONFIRM
-    UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN)
-    WASH-&gt;&gt;WASH: Check state (FINISH) → map to WASH_EVT_RESET
+    UI-&gt;&gt;WASH: xQueueSend(CMD_CONFIRM)
+    WASH-&gt;&gt;WASH: CMD_CONFIRM ở FINISH → WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: FINISH → IDLE
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
 "></figure></div>
@@ -581,17 +675,17 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
     WASH-&gt;&gt;EG: xEventGroupSetBits(EVT_ERROR)
     WASH-&gt;&gt;WASH: xQueueReset(xCommandQueue) (clear stale commands)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;ERROR&quot;)
-    OLED-&gt;&gt;OLED: Render &quot;ERROR&quot;
 
-    Note over WASH: SM blocks on xCommandQueue — chờ lệnh bất kỳ từ UITask
+    Note over WASH: SM blocks on xCommandQueue — chờ lệnh từ UITask
     WASH-&gt;&gt;WASH: xQueueReceive(xCommandQueue, portMAX_DELAY)
+    OLED-&gt;&gt;OLED: Render &quot;ERROR&quot; (chạy khi WashingManager đã block)
 
     Note over SENS: User đóng cửa lại (nhấn PD5) + nhấn PD2 để reset
     actor User
     User-&gt;&gt;UI: Nhấn PD2 → BTN_EVENT_CONFIRM
-    UI-&gt;&gt;WASH: xQueueSend(CMD_START_WASH / CMD_START_SPIN, menuIndex)
-    Note right of WASH: UITask KHÔNG có khái niệm CMD_RESET —&lt;br/&gt;luôn gửi START_WASH/START_SPIN theo menuIndex
-    WASH-&gt;&gt;WASH: Check state (ERROR) → map bất kỳ command nào thành WASH_EVT_RESET
+    UI-&gt;&gt;WASH: xQueueSend(CMD_CONFIRM)
+    Note right of WASH: UITask không biết máy đang ở trạng thái nào —&lt;br/&gt;luôn gửi CMD_CONFIRM, WashingManager tự diễn giải
+    WASH-&gt;&gt;WASH: CMD_CONFIRM ở ERROR → WASH_EVT_RESET
     WASH-&gt;&gt;WASH: SM: ERROR → IDLE
     WASH-&gt;&gt;EG: xEventGroupClearBits(EVT_FINISHED | EVT_ERROR)
     WASH-&gt;&gt;OLED: xQueueSend(DisplayMsg &quot;IDLE&quot;)
@@ -600,7 +694,7 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 <h2 id="6-kịch-bản-d--fill-timeout-nước-không-lên">6. Kịch bản D — Fill Timeout (Nước Không Lên)<a class="anchor" href="#6-kịch-bản-d--fill-timeout-nước-không-lên" aria-label="Liên kết tới mục này">#</a></h2>
 <p><strong>Trigger:</strong> Nước không đạt mức trong 10 giây</p>
 <div class="dg-slot"><figure class="diagram" data-src="flowchart TD
-    A([IDLE]) --&gt;|CMD_START_WASH| B
+    A([IDLE]) --&gt;|&quot;CMD_CONFIRM (con trỏ = Wash)&quot;| B
 
     B[&quot;onEnterFillWater()\n──────────────────\nBSP_Valve_Open INLET\nBSP_LED_On\nxTimerStart xFillTimeoutTimer 10s&quot;]
 
@@ -617,7 +711,7 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
     F --&gt; H
 
     H --&gt; I{&quot;xQueueReceive\nxCommandQueue\n[BLOCKED]&quot;}
-    I --&gt;|CMD_RESET| J([IDLE])
+    I --&gt;|&quot;CMD_CONFIRM (xác nhận)&quot;| J([IDLE])
 
     style B fill:#1b4332,stroke:#2ea043,color:#ffffff
     style C fill:#4a3b00,stroke:#d4a72c,color:#ffffff
@@ -628,52 +722,63 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 "></figure></div>
 <hr>
 <h2 id="7-button-press-flow--từ-phần-cứng-đến-state-machine">7. Button Press Flow — Từ Phần Cứng Đến State Machine<a class="anchor" href="#7-button-press-flow--từ-phần-cứng-đến-state-machine" aria-label="Liên kết tới mục này">#</a></h2>
-<div class="dg-slot"><figure class="diagram" data-src="flowchart TD
-    PA0([&quot;PA0 — B1 Button\nNavigate menu&quot;])
-    PD2([&quot;PD2 — Start Button\nConfirm / Start&quot;])
+<p>Cả hai nút dùng chung một cơ chế chống dội — <strong>lọc theo khoảng lặng</strong>: một cạnh chỉ
+thành cử chỉ nếu đường tín hiệu đã im ít nhất <code>BUTTON_DEBOUNCE_MS</code> (50 ms) trước
+đó, và <strong>mọi cạnh</strong> (kể cả cạnh bị bỏ) đều nạp lại đồng hồ im lặng. Cả hai nút bắn
+sự kiện ngay lúc <strong>nhấn</strong>, không đợi thả tay. UITask chỉ đổi tên cử chỉ thành lệnh;
+WashingManager giữ con trỏ và diễn giải lệnh.</p>
+<div class="dg-slot"><figure class="diagram" data-src="%%{init: {&quot;flowchart&quot;: {&quot;rankSpacing&quot;: 34, &quot;nodeSpacing&quot;: 36}}}%%
+flowchart TB
+    PA0([&quot;&lt;b&gt;PA0 — B1&lt;/b&gt;&lt;br/&gt;chuyển mục menu&quot;])
+    PD2([&quot;&lt;b&gt;PD2 — Start&lt;/b&gt;&lt;br/&gt;xác nhận / bắt đầu&quot;])
 
-    PA0 --&gt;|&quot;RISING edge → record time\nFALLING edge → measure duration&quot;| ISR0
+    PA0 --&gt;|&quot;cạnh lên và xuống&quot;| ISR0
+    PD2 --&gt;|&quot;cạnh xuống&quot;| ISR1
 
-    ISR0[&quot;EXTI0_IRQHandler\n──────────────────\nBSP_Button_IRQHandler()\nduration = HAL_GetTick() - s_pressStartMs&quot;]
+    ISR0[&quot;&lt;b&gt;EXTI0_IRQHandler&lt;/b&gt;&lt;br/&gt;BSP_Button_IRQHandler()&lt;br/&gt;nạp lại s_lastMenuEdgeMs ở MỌI cạnh&quot;]
+    ISR1[&quot;&lt;b&gt;EXTI2_IRQHandler&lt;/b&gt;&lt;br/&gt;BSP_StartButton_IRQHandler()&lt;br/&gt;nạp lại s_lastStartEdgeMs ở MỌI cạnh&quot;]
 
-    ISR0 --&gt; DEB{&quot;duration &lt; 50ms?&quot;}
-    DEB --&gt;|YES| NOISE[&quot;Noise — ignore&quot;]
-    DEB --&gt;|NO = Navigate| S_SEND[&quot;xQueueSendFromISR\n(BTN_EVENT_NAVIGATE)\n+ portYIELD_FROM_ISR&quot;]
+    ISR0 --&gt; Q0{&quot;đã im ≥ 50 ms&lt;br/&gt;và là cạnh nhấn?&quot;}
+    ISR1 --&gt; Q1{&quot;đã im ≥ 50 ms?&quot;}
 
-    PD2 --&gt;|&quot;FALLING edge (press)&quot;| ISR1
+    Q0 --&gt;|&quot;không&quot;| NOISE0[&quot;Nhiễu hoặc cạnh nhả&lt;br/&gt;→ bỏ qua&quot;]
+    Q1 --&gt;|&quot;không&quot;| NOISE1[&quot;Nhiễu&lt;br/&gt;→ bỏ qua&quot;]
+    Q0 --&gt;|&quot;có&quot;| SEND0[&quot;xQueueSendFromISR&lt;br/&gt;BTN_EVENT_NAVIGATE&lt;br/&gt;+ portYIELD_FROM_ISR&quot;]
+    Q1 --&gt;|&quot;có&quot;| SEND1[&quot;xQueueSendFromISR&lt;br/&gt;BTN_EVENT_CONFIRM&lt;br/&gt;+ portYIELD_FROM_ISR&quot;]
 
-    ISR1[&quot;EXTI2_IRQHandler\n──────────────────\nBSP_StartButton_IRQHandler()\nImmediate on press&quot;]
+    SEND0 --&gt; UI_RECV
+    SEND1 --&gt; UI_RECV
 
-    ISR1 --&gt; L_SEND[&quot;xQueueSendFromISR\n(BTN_EVENT_CONFIRM)\n+ portYIELD_FROM_ISR&quot;]
+    UI_RECV[&quot;&lt;b&gt;UITask&lt;/b&gt;&lt;br/&gt;xQueueReceive (chặn)&lt;br/&gt;đổi tên cử chỉ thành lệnh — không giữ trạng thái&quot;]
+    UI_RECV --&gt;|&quot;NAVIGATE → CMD_NAVIGATE&lt;br/&gt;CONFIRM → CMD_CONFIRM&quot;| CMDQ
 
-    L_SEND --&gt; UI_RECV
-    S_SEND --&gt; UI_RECV
+    CMDQ[&quot;xQueueSend(xCommandQueue)&quot;]
+    CMDQ --&gt; MGR[&quot;&lt;b&gt;WashingManager&lt;/b&gt;&lt;br/&gt;xQueueReceive(xCommandQueue)&lt;br/&gt;Manager_HandleCommand()&lt;br/&gt;chỉ đọc ở IDLE · FINISH · ERROR&quot;]
 
-    UI_RECV[&quot;UITask\nxQueueReceive\n(blocks until event)&quot;]
+    MGR --&gt;|&quot;CMD_NAVIGATE&quot;| CUR[&quot;s_menuIndex++ % MENU_ITEM_COUNT&lt;br/&gt;Manager_PostDisplay(trạng thái hiện tại)&lt;br/&gt;→ OLED vẽ lại, chữ trạng thái đúng&quot;]
+    MGR --&gt;|&quot;CMD_CONFIRM ở IDLE&quot;| START[&quot;con trỏ = Wash → WASH_EVT_START_WASH&lt;br/&gt;con trỏ = Spin → WASH_EVT_START_SPIN&quot;]
+    MGR --&gt;|&quot;CMD_CONFIRM ở FINISH / ERROR&quot;| RESET[&quot;WASH_EVT_RESET → IDLE&quot;]
 
-    UI_RECV --&gt;|BTN_EVENT_NAVIGATE| CURSOR[&quot;menuIndex++\n% MENU_ITEM_COUNT\n────────────────────\nxQueueSend(xDisplayQueue)\n{ menuIndex, s_statusCache }&quot;]
-
-    UI_RECV --&gt;|BTN_EVENT_CONFIRM| CMD_BUILD{&quot;menuIndex == 0?&quot;}
-
-    CMD_BUILD --&gt;|&quot;YES (Wash)&quot;| WASH_CMD[&quot;cmd = { CMD_START_WASH\nWASH_MODE_WASH\nmenuIndex }&quot;]
-    CMD_BUILD --&gt;|&quot;NO (Spin)&quot;| SPIN_CMD[&quot;cmd = { CMD_START_SPIN\nWASH_MODE_SPIN\nmenuIndex }&quot;]
-
-    WASH_CMD --&gt; SEND_CMD[&quot;xQueueSend(xCommandQueue)&quot;]
-    SPIN_CMD --&gt; SEND_CMD
-
-    SEND_CMD --&gt; MGR[&quot;WashingManager\nxQueueReceive(xCommandQueue)\nManager_HandleCommand()&quot;]
-
-    MGR --&gt;|CMD_START_WASH| SM_W[&quot;WashingSM_ProcessEvent\n(WASH_EVT_START_WASH)\n→ IDLE → FILL_WATER&quot;]
-    MGR --&gt;|CMD_START_SPIN| SM_S[&quot;WashingSM_ProcessEvent\n(WASH_EVT_START_SPIN)\n→ IDLE → SPIN&quot;]
-
-    CURSOR --&gt; OLED_UPD[&quot;OLEDTask\nxQueueReceive(xDisplayQueue)\nRender cursor move&quot;]
-
-    style NOISE fill:#5c1d24,stroke:#f85149,color:#ffffff
-    style L_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
-    style S_SEND fill:#0d3b66,stroke:#388bfd,color:#ffffff
-    style CURSOR fill:#1b4332,stroke:#2ea043,color:#ffffff
-    style SEND_CMD fill:#0d3b66,stroke:#388bfd,color:#ffffff
+    classDef hw    fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
+    classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
+    classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
+    classDef hub   fill:#cfe3ff,stroke:#1c64f2,stroke-width:4px,color:#1f2328
+    classDef queue fill:#e3f6e8,stroke:#2f9e44,stroke-width:2px,color:#1f2328
+    classDef bad   fill:#fde8e8,stroke:#d1242f,stroke-width:2px,color:#1f2328
+    classDef out   fill:#eceff3,stroke:#6b7280,stroke-width:2px,color:#1f2328
+    class PA0,PD2 hw
+    class ISR0,ISR1,SEND0,SEND1 isr
+    class UI_RECV task
+    class CMDQ queue
+    class MGR hub
+    class NOISE0,NOISE1 bad
+    class CUR,START,RESET out
 "></figure></div>
+<blockquote>
+<p><strong>Giới hạn đã biết của PD2:</strong> EXTI2 chỉ cấu hình cạnh xuống nên ISR không thấy cạnh
+nhả; một chùm dội lúc nhả vẫn có thể lọt thành một <code>CMD_CONFIRM</code> thừa. Chi tiết và
+cách khắc phục trong <code>App/BSP/Src/bsp_button.c</code>.</p>
+</blockquote>
 <hr>
 <h2 id="8-software-timer-flow--cách-timer-lái-state-machine">8. Software Timer Flow — Cách Timer Lái State Machine<a class="anchor" href="#8-software-timer-flow--cách-timer-lái-state-machine" aria-label="Liên kết tới mục này">#</a></h2>
 <div class="dg-slot"><figure class="diagram" data-src="flowchart LR
@@ -710,7 +815,7 @@ Mỗi sơ đồ tập trung vào một khía cạnh cụ thể để dễ debug.
 <p>Bảng này dùng để debug: nếu chương trình treo, xem task nào đang block và tại sao.</p>
 <div class="dg-slot"><figure class="diagram" data-src="flowchart TD
     subgraph &quot;Trong mỗi phase, WashingManager block tại:&quot;
-        IDLE_B[&quot;STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn PD2 (Start/Confirm)&quot;]
+        IDLE_B[&quot;STATE: IDLE / FINISH / ERROR\n──────────────────────\nxQueueReceive(xCommandQueue)\nportMAX_DELAY\n─\nChờ user nhấn nút (PA0 chuyển mục · PD2 xác nhận)&quot;]
 
         FILL_B[&quot;STATE: FILL_WATER\n──────────────────────\nxEventGroupWaitBits\n(EVT_WATER_FULL OR EVT_TIMEOUT OR EVT_ERROR)\nportMAX_DELAY\n─\nChờ sensor OR timer 10s OR cửa mở&quot;]
 
@@ -755,7 +860,7 @@ Font: 6×8 px per character → 21 chars/row, 8 rows max
 
 Owner phân quyền:
   Row 2: hardcoded trong oled_task.c
-  Row 3–4: menuIndex từ DisplayMsg_t (owner: UITask → truyền qua CommandMsg_t)
+  Row 3–4: menuIndex từ DisplayMsg_t (owner: WashingManager — con trỏ menu)
   Row 5: statusText từ DisplayMsg_t (owner: WashingManager)
 </code></pre>
 
@@ -793,7 +898,7 @@ Owner phân quyền:
 <td><code>xDisplayQueue</code></td>
 <td>Queue</td>
 <td>5 items</td>
-<td>WashingManager, UITask</td>
+<td>WashingManager (duy nhất)</td>
 <td>OLEDTask</td>
 <td><code>xQueueSend</code> / <code>xQueueReceive</code></td>
 </tr>
@@ -808,7 +913,7 @@ Owner phân quyền:
 <tr>
 <td><code>xFillTimeoutTimer</code></td>
 <td>SW Timer</td>
-<td>One-shot 10 s</td>
+<td>One-shot 10 s (timeout an toàn)</td>
 <td>WashingManager</td>
 <td>TimerServiceTask</td>
 <td><code>xTimerStart</code> / callback</td>
@@ -956,6 +1061,13 @@ Owner phân quyền:
     function fitWidth() {
       var vw = view.clientWidth;
       var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      if (!isFull()) {
+        // A diagram only a little taller than the frame is easier to read whole than
+        // scrolled: shrink it (by at most 30 %) so it fits. Much taller ones keep
+        // fit-to-width and are panned instead.
+        var kWhole = (window.innerHeight * 0.82 - 24) / S.h;
+        if (S.h * k + 24 > window.innerHeight * 0.82 && kWhole >= k * 0.7) k = kWhole;
+      }
       S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
       setViewHeight(S.h * S.k + 24);
       var vh = view.clientHeight;

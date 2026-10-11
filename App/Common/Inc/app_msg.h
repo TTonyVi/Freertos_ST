@@ -23,26 +23,21 @@
  *
  * Sent by UITask to WashingManager via the Command Queue.
  *
- * UITask builds this after interpreting a ButtonEvent_t against the
- * current menu cursor position (BTN_EVENT_CONFIRM on PD2 — any press,
- * no long-press gesture anymore):
+ * UITask builds this from a ButtonEvent_t — one gesture, one command, no
+ * other information. It deliberately carries NO menu position or program:
+ * the cursor lives in WashingManager (its single owner), so there is no
+ * second copy that could drift out of step with what the OLED shows.
+ * See Command_t in app_types.h for how each command is interpreted.
  *
- *   cursor on "Wash" + PD2 press  →  { CMD_START_WASH, WASH_MODE_WASH }
- *   cursor on "Spin" + PD2 press  →  { CMD_START_SPIN, WASH_MODE_SPIN }
- *
- * UITask never builds CMD_RESET — while WashingManager is in FINISH or
- * ERROR, it reinterprets whichever of the two commands above arrives as
- * a reset back to IDLE instead of decoding it normally. See
- * Manager_HandleCommand() in washing_manager.c.
+ * Kept as a struct rather than a bare Command_t so a future command that
+ * needs a payload can add a field without changing the queue's item type.
  *
  * WashingManager reads this with xQueueReceive() and drives the state
  * machine accordingly.
  * -------------------------------------------------------------------------- */
 typedef struct
 {
-    Command_t  command;    /**< The requested action. */
-    WashMode_t mode;       /**< Program to run; only used when command = CMD_START_*. */
-    uint8_t    menuIndex;  /**< Cursor position at the time the command was sent. */
+    Command_t command;    /**< The requested action. */
 } CommandMsg_t;
 
 /* --------------------------------------------------------------------------
@@ -59,6 +54,9 @@ typedef struct
  *   Line 1 : "> Wash"  or  "  Wash"   (menu item 0, cursor driven by menuIndex)
  *   Line 2 : "> Spin"  or  "  Spin"   (menu item 1)
  *   Line 3 : statusText               (state / error message, max 23 chars)
+ *
+ * WashingManager is the ONLY producer: it alone knows the state, the cursor
+ * and the status text, so every message it builds is complete and consistent.
  *
  * statusText is 24 bytes (23 visible chars + null terminator) because
  * the SSD1306 at 6×8 font fits 21 chars per line; 24 bytes gives safe

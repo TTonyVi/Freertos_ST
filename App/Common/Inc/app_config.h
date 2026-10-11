@@ -15,7 +15,8 @@
  * Simulation timing (milliseconds)
  * -------------------------------------------------------------------------- */
 
-/** Duration of the water-fill phase. */
+/** Fill-water SAFETY TIMEOUT, not a fill duration: the inlet valve stays open
+ *  until the water sensor reports full; if that takes longer than this, ERROR. */
 #define WASH_FILL_DURATION_MS       10000U
 
 /** Duration of the active wash / agitation phase. */
@@ -40,6 +41,16 @@
  * the ~150 ms a human needs between two deliberate presses.
  */
 #define BUTTON_DEBOUNCE_MS             50U
+
+/* --------------------------------------------------------------------------
+ * Menu
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Number of items in the on-screen menu (0 = Wash, 1 = Spin). The cursor
+ * wraps modulo this value. Keep in step with the rows OLEDTask draws.
+ */
+#define MENU_ITEM_COUNT                  2u
 
 /* --------------------------------------------------------------------------
  * Queue capacities (number of items)

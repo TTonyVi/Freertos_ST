@@ -271,7 +271,7 @@ img { max-width: 100%; }
 <header class="topbar">
   <button class="icon-btn toc-toggle" type="button" aria-label="Mở mục lục" title="Mục lục">☰</button>
   <a class="brand" href="#top">Washing Machine Simulator</a>
-  <nav class="docnav" aria-label="Bộ tài liệu"><a href="docs/START_HERE.html">Học FreeRTOS</a><a href="docs/SYSTEM_DIAGRAMS.html">Sơ đồ hệ thống</a><a href="PROJECT_SPEC.html" aria-current="page">Đặc tả</a></nav>
+  <nav class="docnav" aria-label="Bộ tài liệu"><a href="docs/START_HERE.html">Học FreeRTOS</a><a href="docs/SYSTEM_DIAGRAMS.html">Sơ đồ hệ thống</a><a href="PROJECT_SPEC.html" aria-current="page">Đặc tả</a><a href="docs/LEARNING_NOTES.html">Ghi chú học tập</a></nav>
   <button class="icon-btn theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Sáng / tối">◐</button>
 </header>
 <div class="layout" id="top">
@@ -564,11 +564,12 @@ img { max-width: 100%; }
 <h1 id="7-rtos-architecture">7. RTOS Architecture<a class="anchor" href="#7-rtos-architecture" aria-label="Liên kết tới mục này">#</a></h1>
 <p>Bốn task chia sẻ với nhau qua ba queue và một event group. Mọi luồng dữ liệu đều
 <strong>một chiều</strong> và mỗi đối tượng chỉ có <strong>một bên gửi, một bên nhận chính</strong>.</p>
-<div class="dg-slot"><figure class="diagram" data-src="flowchart TB
+<div class="dg-slot"><figure class="diagram" data-src="%%{init: {&quot;flowchart&quot;: {&quot;rankSpacing&quot;: 34, &quot;nodeSpacing&quot;: 36, &quot;subGraphTitleMargin&quot;: {&quot;top&quot;: 4, &quot;bottom&quot;: 22}}}}%%
+flowchart TB
     subgraph CMD[&quot;① Luồng lệnh người dùng&quot;]
         ISR([&quot;&lt;b&gt;Button ISR&lt;/b&gt;&lt;br/&gt;PA0 · PD2&quot;])
         BQ[(&quot;&lt;b&gt;Button Queue&lt;/b&gt;&quot;)]
-        UI[&quot;&lt;b&gt;UI Task&lt;/b&gt; · Prio 2&lt;br/&gt;menu · tạo lệnh&quot;]
+        UI[&quot;&lt;b&gt;UI Task&lt;/b&gt; · Prio 2&lt;br/&gt;đổi tên nút bấm thành lệnh&quot;]
         CQ[(&quot;&lt;b&gt;Command Queue&lt;/b&gt;&quot;)]
         ISR --&gt; BQ --&gt; UI --&gt; CQ
     end
@@ -581,9 +582,10 @@ img { max-width: 100%; }
         TMR --&gt; EG
     end
 
-    WM[&quot;&lt;b&gt;WashingManager Task&lt;/b&gt; · Prio 3&lt;br/&gt;chủ duy nhất của máy trạng thái&lt;br/&gt;điều khiển motor · van · đèn&quot;]
+    WM[&quot;&lt;b&gt;WashingManager Task&lt;/b&gt; · Prio 3&lt;br/&gt;chủ duy nhất của máy trạng thái&lt;br/&gt;và của con trỏ menu&lt;br/&gt;điều khiển motor · van · đèn&quot;]
 
     subgraph DSP[&quot;③ Luồng hiển thị&quot;]
+        direction LR
         DQ[(&quot;&lt;b&gt;Display Queue&lt;/b&gt;&quot;)]
         OLED[&quot;&lt;b&gt;OLED Task&lt;/b&gt; · Prio 1&lt;br/&gt;chủ duy nhất của OLED&quot;]
         DQ --&gt; OLED
@@ -591,7 +593,7 @@ img { max-width: 100%; }
 
     CQ --&gt; WM
     EG --&gt; WM
-    WM --&gt; DQ
+    WM --&gt; DSP
 
     classDef isr   fill:#fff1e0,stroke:#e8590c,stroke-width:2px,color:#1f2328
     classDef task  fill:#e3f0ff,stroke:#1c64f2,stroke-width:2px,color:#1f2328
@@ -649,7 +651,8 @@ img { max-width: 100%; }
 <p><strong>Cách đọc:</strong></p>
 <ol>
 <li><strong>Luồng lệnh</strong> — nút bấm tạo ngắt; ISR đẩy sự kiện vào Button Queue; UI Task
-diễn giải theo vị trí con trỏ menu rồi gửi lệnh Start qua Command Queue.</li>
+đổi tên cử chỉ thành lệnh (<code>CMD_NAVIGATE</code> / <code>CMD_CONFIRM</code>) rồi gửi qua Command
+Queue. WashingManager mới là bên giữ con trỏ menu và diễn giải lệnh.</li>
 <li><strong>Luồng sự kiện</strong> — Sensor Task (định kỳ) và các Software Timer (khi hết giờ)
 set bit vào Event Group; WashingManager chờ đúng những bit có nghĩa ở trạng
 thái hiện tại.</li>
@@ -666,17 +669,20 @@ trong sơ đồ này.</p>
 <p>Responsibilities:</p>
 <ul>
 <li>Process button events</li>
-<li>Menu navigation</li>
-<li>Mode selection</li>
-<li>Generate commands</li>
+<li>Translate each gesture into a command (CMD_NAVIGATE / CMD_CONFIRM)</li>
 </ul>
 <p>Priority:</p>
 <p>2</p>
+<p>Notes:</p>
+<p>UITask holds no state — it does not know the menu cursor or the machine state.
+Both belong to WashingManager (single owner), so the screen and the command
+interpretation can never disagree.</p>
 <hr>
 <h2 id="washingmanager-task">WashingManager Task<a class="anchor" href="#washingmanager-task" aria-label="Liên kết tới mục này">#</a></h2>
 <p>Responsibilities:</p>
 <ul>
 <li>State machine execution</li>
+<li>Menu cursor ownership and the single source of every display update</li>
 <li>System coordination</li>
 <li>Motor control</li>
 <li>Valve control</li>
@@ -763,7 +769,8 @@ trong sơ đồ này.</p>
 <hr>
 <h1 id="10-simulation-timing">10. Simulation Timing<a class="anchor" href="#10-simulation-timing" aria-label="Liên kết tới mục này">#</a></h1>
 <p>Fill Water:</p>
-<p>10 seconds</p>
+<p>Up to 10 seconds — a safety timeout only. The inlet valve stays open until the
+water level sensor reports full; if it never does, the machine enters ERROR</p>
 <p>Wash:</p>
 <p>20 seconds</p>
 <p>Drain:</p>
@@ -1031,6 +1038,13 @@ trong sơ đồ này.</p>
     function fitWidth() {
       var vw = view.clientWidth;
       var k = Math.min(isFull() ? 1.6 : 1, (vw - 24) / S.w);
+      if (!isFull()) {
+        // A diagram only a little taller than the frame is easier to read whole than
+        // scrolled: shrink it (by at most 30 %) so it fits. Much taller ones keep
+        // fit-to-width and are panned instead.
+        var kWhole = (window.innerHeight * 0.82 - 24) / S.h;
+        if (S.h * k + 24 > window.innerHeight * 0.82 && kWhole >= k * 0.7) k = kWhole;
+      }
       S.k = clamp(k, MIN_ZOOM, MAX_ZOOM);
       setViewHeight(S.h * S.k + 24);
       var vh = view.clientHeight;
